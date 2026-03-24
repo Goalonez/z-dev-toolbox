@@ -63,20 +63,22 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Package extension asset
+        env:
+          Z_DEV_TOOLBOX_RELEASE_ROOT: release-assets/build
         run: pnpm package:extension
 
       - name: Upload extension asset
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: extension-release-assets
-          path: release/v${{ needs.prepare.outputs.version }}/z-dev-toolbox-extension-v${{ needs.prepare.outputs.version }}.zip
+          path: release-assets/build/z-dev-toolbox-extension-v${{ needs.prepare.outputs.version }}.zip
           if-no-files-found: error
 
   build-desktop:
@@ -108,7 +110,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install Rust stable
@@ -138,10 +140,53 @@ jobs:
           projectPath: apps/desktop/src-tauri
           tauriScript: pnpm --filter @z-dev-toolbox/desktop exec tauri
           args: --bundles ${{ matrix.bundle }}
-          uploadUpdaterJson: false
-          uploadUpdaterSignatures: false
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: desktop-[platform]-[bundle]
+
+      - name: Prepare desktop artifact
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        shell: bash
+        run: |
+          case "${{ matrix.runner }}" in
+            macos-latest)
+              platform_key="macos"
+              extension="dmg"
+              source_pattern="*.dmg"
+              ;;
+            windows-latest)
+              platform_key="windows"
+              extension="exe"
+              source_pattern="*.exe"
+              ;;
+            ubuntu-22.04)
+              platform_key="linux"
+              extension="AppImage"
+              source_pattern="*.AppImage"
+              ;;
+            *)
+              echo "Unsupported runner: ${{ matrix.runner }}" >&2
+              exit 1
+              ;;
+          esac
+
+          bundle_dir="apps/desktop/src-tauri/target/release/bundle/${{ matrix.bundle }}"
+          mkdir -p "release-assets/desktop-${platform_key}"
+          source_file=$(find "$bundle_dir" -maxdepth 1 -type f -name "$source_pattern" | head -n 1)
+
+          if [[ -z "$source_file" ]]; then
+            echo "Desktop bundle not found in $bundle_dir" >&2
+            exit 1
+          fi
+
+          cp \
+            "$source_file" \
+            "release-assets/desktop-${platform_key}/z-dev-toolbox-desktop-${platform_key}-v${RELEASE_VERSION}.${extension}"
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ matrix.runner }}-${{ matrix.bundle }}
+          path: release-assets/desktop-*/*
+          if-no-files-found: error
 
   publish-release:
     needs:
@@ -163,14 +208,14 @@ jobs:
 
       - name: Download extension asset
         if: needs.prepare.outputs.publish_extension == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-release-assets
           path: release-assets/raw/extension
 
       - name: Download desktop assets
         if: needs.prepare.outputs.publish_desktop == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
           path: release-assets/raw
@@ -193,14 +238,36 @@ jobs:
 
       - name: Publish GitHub release with assets
         if: steps.assets.outputs.count != '0'
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: release-notes/${{ needs.prepare.outputs.tag }}.md
-          files: release-assets/final/*
-          fail_on_unmatched_files: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          notes_file="release-notes/${RELEASE_TAG}.md"
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" --notes-file "${notes_file}"
+            gh release upload "${RELEASE_TAG}" release-assets/final/* --clobber
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            release-assets/final/* \
+            --notes-file "${notes_file}" \
+            --verify-tag
 
       - name: Publish GitHub release notes
         if: steps.assets.outputs.count == '0'
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: release-notes/${{ needs.prepare.outputs.tag }}.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          notes_file="release-notes/${RELEASE_TAG}.md"
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" --notes-file "${notes_file}"
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            --notes-file "${notes_file}" \
+            --verify-tag

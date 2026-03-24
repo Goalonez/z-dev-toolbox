@@ -58,13 +58,13 @@ docker run -d \
 
 启动后直接打开 `http://localhost:8080`。
 
-如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.1`。
+如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.2`。
 
 ## 从源码运行
 
 ### 环境要求
 
-- Node.js `>= 22`
+- Node.js `24.14.0`（本地开发与 GitHub Actions 统一以 `.nvmrc` 为准）
 - `pnpm@10`
 - 如果你要运行桌面端，还需要 Rust 工具链和 Tauri 运行前置依赖
 
@@ -108,6 +108,15 @@ pnpm --filter @z-dev-toolbox/extension build
 
 解包后的生产插件目录位于 `apps/extension/build/chrome-mv3-prod`。  
 在 Chrome 或 Edge 中打开 `chrome://extensions`，开启开发者模式后即可加载这个目录。
+
+构建用于发布的插件 zip：
+
+```bash
+pnpm package:extension
+```
+
+默认会输出到 `release/v<version>/z-dev-toolbox-extension-v<version>.zip`，同时保留同名解包目录便于本地检查。
+GitHub Actions 不会提交这个目录；正式 release 工作流会在临时工作区内构建同样的 zip，然后直接上传为 release asset。
 
 点击插件图标时，会打开工具箱的 options 页面。
 

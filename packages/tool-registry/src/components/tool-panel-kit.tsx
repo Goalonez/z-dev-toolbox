@@ -407,6 +407,7 @@ interface ToolSelectProps extends Omit<
   onValueChange?: (value: string) => void;
   panelMaxWidth?: number;
   renderValue?: (option?: { value: string; label: ReactNode }) => ReactNode;
+  embedded?: boolean;
 }
 
 const ChevronIcon = ({ open }: { open: boolean }) => (
@@ -432,6 +433,7 @@ export const ToolSelect = ({
   onValueChange,
   panelMaxWidth,
   renderValue,
+  embedded = false,
   ...props
 }: ToolSelectProps) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -567,8 +569,10 @@ export const ToolSelect = ({
         ref={buttonRef}
         data-tool-select-trigger="true"
         className={cn(
-          "inline-flex h-10 min-w-0 max-w-full items-center justify-between gap-2 whitespace-nowrap rounded-[18px] border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-surface-strong)/0.94))] px-3 text-sm text-foreground shadow-[0_14px_26px_-26px_rgb(var(--color-shadow-ambient)/0.26)] outline-none transition-[background-color,border-color,color,box-shadow,transform]",
-          "hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.14)] focus:border-accent/26 focus:outline-none focus:ring-0 focus:shadow-[0_0_0_4px_rgb(var(--color-accent)/0.08),0_18px_34px_-24px_rgb(var(--color-shadow-ambient)/0.4)] focus-visible:outline-none focus-visible:ring-0",
+          "inline-flex h-10 min-w-0 max-w-full items-center justify-between gap-2 whitespace-nowrap rounded-[18px] border text-sm text-foreground outline-none transition-[background-color,border-color,color,box-shadow,transform] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
+          embedded
+            ? "border-0 bg-transparent px-0 text-xs shadow-none hover:translate-y-0 hover:border-0 hover:bg-transparent hover:shadow-none focus:border-0 focus:shadow-none"
+            : "border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-surface-strong)/0.94))] px-3 shadow-[0_14px_26px_-26px_rgb(var(--color-shadow-ambient)/0.26)] hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.14)] focus:border-accent/26 focus:shadow-[0_0_0_4px_rgb(var(--color-accent)/0.08),0_18px_34px_-24px_rgb(var(--color-shadow-ambient)/0.4)]",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
@@ -587,7 +591,7 @@ export const ToolSelect = ({
             ? renderValue(selectedOption)
             : (selectedOption?.label ?? value)}
         </span>
-        <span className="text-muted">
+        <span className={cn("text-muted", embedded && "shrink-0")}>
           <ChevronIcon open={open} />
         </span>
       </button>

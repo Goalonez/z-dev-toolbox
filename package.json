@@ -1,10 +1,10 @@
 {
   "name": "z-dev-toolbox",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "packageManager": "pnpm@10.32.1",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.14.0 <25"
   },
   "scripts": {
     "audit:repo": "node ./scripts/check-public-repo.mjs",

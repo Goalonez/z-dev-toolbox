@@ -58,13 +58,13 @@ docker run -d \
 
 Then open `http://localhost:8080`.
 
-If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.1`.
+If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.2`.
 
 ## Use From Source
 
 ### Requirements
 
-- Node.js `>= 22`
+- Node.js `24.14.0` (`.nvmrc` is the source of truth used by local development and GitHub Actions)
 - `pnpm@10`
 - Rust toolchain and Tauri prerequisites if you want to run the desktop app
 
@@ -108,6 +108,15 @@ pnpm --filter @z-dev-toolbox/extension build
 
 The unpacked production extension is generated in `apps/extension/build/chrome-mv3-prod`.  
 In Chrome or Edge, enable Developer Mode on `chrome://extensions` and load that directory as an unpacked extension.
+
+Build the release-style extension zip:
+
+```bash
+pnpm package:extension
+```
+
+By default, the script writes `release/v<version>/z-dev-toolbox-extension-v<version>.zip` and its unpacked sibling directory for local inspection.
+GitHub Actions does not commit that directory; the release workflow builds the same zip in a temporary workspace path and uploads it directly as a release asset.
 
 The extension action opens the toolbox in its options page.
 

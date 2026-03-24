@@ -7,7 +7,7 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -17,7 +17,9 @@ const packageJson = JSON.parse(
   readFileSync(join(repoRoot, "package.json"), "utf8"),
 );
 const version = packageJson.version;
-const releaseRoot = join(repoRoot, "release", `v${version}`);
+const releaseRoot = process.env.Z_DEV_TOOLBOX_RELEASE_ROOT
+  ? resolve(repoRoot, process.env.Z_DEV_TOOLBOX_RELEASE_ROOT)
+  : join(repoRoot, "release", `v${version}`);
 const cliArgs = process.argv.slice(2);
 const replaceExisting = cliArgs.includes("--replace");
 const positionalArgs = cliArgs.filter((arg) => arg !== "--replace");
@@ -86,7 +88,9 @@ const zipDirectory = (directoryPath, zipPath) => {
     return;
   }
 
-  run("zip", ["-rq", zipPath, directoryPath], dirname(directoryPath));
+  // Keep a single top-level directory in the archive instead of embedding
+  // the absolute source path from CI workspaces.
+  run("zip", ["-rq", zipPath, basename(directoryPath)], dirname(directoryPath));
 };
 
 const findLatestMatchingFile = (directoryPath, matcher) => {
@@ -126,23 +130,10 @@ const packageExtension = () => {
     "build",
     "chrome-mv3-prod",
   );
-  const sourceZip = join(
-    repoRoot,
-    "apps",
-    "extension",
-    "build",
-    "chrome-mv3-prod.zip",
-  );
   const targetDir = join(releaseRoot, releaseNames.extension);
   const targetZip = join(releaseRoot, `${releaseNames.extension}.zip`);
 
   copyDirectory(sourceDir, targetDir);
-
-  if (existsSync(sourceZip)) {
-    copyFile(sourceZip, targetZip);
-    return;
-  }
-
   zipDirectory(targetDir, targetZip);
 };
 

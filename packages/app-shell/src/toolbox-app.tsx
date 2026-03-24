@@ -18,6 +18,7 @@ import { defaultPreferences, useToolboxStore } from "@z-dev-toolbox/state";
 import type { StorageAdapter } from "@z-dev-toolbox/storage";
 import {
   toolRegistry,
+  ToolSelect,
   type ToolPanelNotification,
 } from "@z-dev-toolbox/tool-registry";
 import { Button, Card, Input, cn } from "@z-dev-toolbox/ui";
@@ -555,68 +556,128 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
   }, []);
 
   const ActivePanel = selectedTool?.Panel;
+  const selectedToolName = selectedTool
+    ? getLocalizedManifest(selectedTool.manifest, locale).name
+    : "";
 
   return (
     <div className="min-h-dvh h-dvh overflow-hidden bg-background bg-shell-grid bg-[size:36px_36px] text-foreground">
       <div className="mx-auto flex h-full w-full max-w-[1700px] px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-4">
         <div className="grid h-full min-h-0 w-full gap-3 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[220px_minmax(0,1fr)] md:grid-rows-1">
           <Card className="flex min-h-0 flex-col gap-2.5 overflow-hidden p-2.5 sm:gap-3 sm:p-3">
-            <div className="space-y-2 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] pb-2.5">
-              <div className="text-left md:text-center">
-                <div className="text-[1.15rem] font-semibold leading-none tracking-[-0.03em] text-foreground sm:text-[1.3rem] lg:text-[1.42rem]">
-                  {text.projectName}
+            <div className="space-y-2 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] pb-2.5 md:space-y-3">
+              <div className="flex items-start justify-between gap-3 md:block md:text-center">
+                <div className="min-w-0 text-left md:text-center">
+                  <div className="truncate text-[1.15rem] font-semibold leading-none tracking-[-0.03em] text-foreground sm:text-[1.3rem] lg:text-[1.42rem]">
+                    {text.projectName}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-start gap-1.5 md:justify-center">
-                <Button
-                  aria-label={text.settingsLabel}
-                  className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => {
-                    setIsSettingsOpen(true);
-                  }}
-                >
-                  <SettingsIcon />
-                </Button>
-                <Button
-                  aria-label={text.localeLabel}
-                  className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => {
-                    setLocale(locale === "zh-CN" ? "en-US" : "zh-CN");
-                  }}
-                >
-                  <GlobeIcon />
-                </Button>
-                <Button
-                  aria-label={text.themeLabel}
-                  className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
-                  size="icon"
-                  variant="secondary"
-                  onClick={() => {
-                    setThemeMode(themeMode === "dark" ? "light" : "dark");
-                  }}
-                >
-                  <ThemeToggleIcon themeMode={themeMode} />
-                </Button>
-                <a
-                  aria-label={text.repositoryLabel}
-                  className={cn(
-                    "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_28px_-24px_rgb(var(--color-shadow-ambient)/0.26)] transition-[background-color,border-color,color,box-shadow,transform] sm:h-8 sm:w-8",
-                    "hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/22 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                  href={REPOSITORY_URL}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <GitHubIcon />
-                </a>
+                <div className="flex items-center justify-start gap-1.5 md:mt-2 md:justify-center">
+                  <Button
+                    aria-label={text.settingsLabel}
+                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => {
+                      setIsSettingsOpen(true);
+                    }}
+                  >
+                    <SettingsIcon />
+                  </Button>
+                  <Button
+                    aria-label={text.localeLabel}
+                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => {
+                      setLocale(locale === "zh-CN" ? "en-US" : "zh-CN");
+                    }}
+                  >
+                    <GlobeIcon />
+                  </Button>
+                  <Button
+                    aria-label={text.themeLabel}
+                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    size="icon"
+                    variant="secondary"
+                    onClick={() => {
+                      setThemeMode(themeMode === "dark" ? "light" : "dark");
+                    }}
+                  >
+                    <ThemeToggleIcon themeMode={themeMode} />
+                  </Button>
+                  <a
+                    aria-label={text.repositoryLabel}
+                    className={cn(
+                      "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_28px_-24px_rgb(var(--color-shadow-ambient)/0.26)] transition-[background-color,border-color,color,box-shadow,transform] sm:h-8 sm:w-8",
+                      "hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/22 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                    href={REPOSITORY_URL}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <GitHubIcon />
+                  </a>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 md:hidden">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(9rem,42%)] gap-2">
+                <Input
+                  ref={searchInputRef}
+                  autoFocus
+                  className="h-11 rounded-[18px]"
+                  placeholder={text.searchPlaceholder}
+                  type="search"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.currentTarget.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      cycleVisibleTool(event.key === "ArrowDown" ? 1 : -1);
+                      return;
+                    }
+
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      focusFirstWorkspaceField();
+                    }
+                  }}
+                />
+                <ToolSelect
+                  aria-label={text.toolListLabel}
+                  className="h-11 w-full rounded-[18px] px-3 text-sm"
+                  value={selectedTool?.manifest.id}
+                  renderValue={() => selectedToolName || text.noTools}
+                  onValueChange={(value: string) => {
+                    const nextTool = visibleTools.find(
+                      (tool) => tool.manifest.id === value,
+                    );
+
+                    if (!nextTool) {
+                      return;
+                    }
+
+                    activateTool(nextTool.manifest.id, { focusWorkspace: true });
+                  }}
+                >
+                  {visibleTools.map((tool) => {
+                    const manifest = getLocalizedManifest(tool.manifest, locale);
+
+                    return (
+                      <option key={tool.manifest.id} value={tool.manifest.id}>
+                        {manifest.name}
+                      </option>
+                    );
+                  })}
+                </ToolSelect>
+              </div>
+            </div>
+
+            <div className="hidden space-y-2 md:block">
               <div className="text-[0.65rem] font-medium uppercase tracking-[0.18em] text-muted sm:text-[0.68rem] sm:tracking-[0.24em]">
                 {text.toolListLabel}
               </div>
@@ -645,7 +706,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               />
             </div>
 
-            <div className="min-h-0 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-1 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
+            <div className="hidden min-h-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:flex-1 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
               {visibleTools.map((tool) => {
                 const manifest = getLocalizedManifest(tool.manifest, locale);
                 const isActive = tool.manifest.id === selectedTool?.manifest.id;

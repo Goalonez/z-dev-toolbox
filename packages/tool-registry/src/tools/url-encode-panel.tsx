@@ -141,7 +141,8 @@ export const UrlEncodePanel = ({
             <ToolControlField label={text.spaceModeLabel}>
               <ToolSelect
                 aria-label={text.spaceModeLabel}
-                className="h-7 min-w-0 max-w-full flex-1 border-0 bg-transparent px-0 pr-6 text-xs shadow-none hover:bg-transparent focus:border-0 focus:shadow-none sm:min-w-24"
+                className="h-7 min-w-0 max-w-full flex-1 pr-6 sm:min-w-24"
+                embedded
                 value={draft.spaceMode}
                 onValueChange={(value) => {
                   updateDraft({

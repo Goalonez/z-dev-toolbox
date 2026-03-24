@@ -196,7 +196,8 @@ export const FormatConvertPanel = ({
             <ToolControlField label={text.sourceFormatLabel}>
               <ToolSelect
                 aria-label={text.sourceFormatLabel}
-                className="h-7 min-w-0 max-w-full flex-1 border-0 bg-transparent px-0 pr-6 text-xs shadow-none hover:bg-transparent focus:border-0 focus:shadow-none sm:min-w-28"
+                className="h-7 min-w-0 max-w-full flex-1 pr-6 sm:min-w-28"
+                embedded
                 value={draft.sourceFormat}
                 onValueChange={(value) => {
                   updateDraft({
@@ -218,7 +219,8 @@ export const FormatConvertPanel = ({
             <ToolControlField label={text.targetFormatLabel}>
               <ToolSelect
                 aria-label={text.targetFormatLabel}
-                className="h-7 min-w-0 max-w-full flex-1 border-0 bg-transparent px-0 pr-6 text-xs shadow-none hover:bg-transparent focus:border-0 focus:shadow-none sm:min-w-28"
+                className="h-7 min-w-0 max-w-full flex-1 pr-6 sm:min-w-28"
+                embedded
                 value={draft.targetFormat}
                 onValueChange={(value) => {
                   updateDraft({

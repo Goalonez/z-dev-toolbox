@@ -285,7 +285,8 @@ export const TextDiffPanel = ({
             <ToolControlField label={text.highlightLabel}>
               <ToolSelect
                 aria-label={text.highlightLabel}
-                className="h-7 min-w-0 max-w-full flex-1 border-0 bg-transparent px-0 pr-6 text-xs shadow-none hover:bg-transparent focus:border-0 focus:shadow-none sm:min-w-36"
+                className="h-7 min-w-0 max-w-full flex-1 pr-6 sm:min-w-36"
+                embedded
                 value={draft.highlightMode}
                 onValueChange={(value) => {
                   setDraft((current) => ({
@@ -304,7 +305,8 @@ export const TextDiffPanel = ({
             <ToolControlField label={text.ignoreLabel}>
               <ToolSelect
                 aria-label={text.ignoreLabel}
-                className="h-7 min-w-0 max-w-full flex-1 border-0 bg-transparent px-0 pr-6 text-xs shadow-none hover:bg-transparent focus:border-0 focus:shadow-none sm:min-w-36"
+                className="h-7 min-w-0 max-w-full flex-1 pr-6 sm:min-w-36"
+                embedded
                 value={draft.ignoreMode}
                 onValueChange={(value) => {
                   setDraft((current) => ({
