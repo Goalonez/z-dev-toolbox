@@ -116,6 +116,7 @@ pnpm package:extension
 ```
 
 By default, the script writes `release/v<version>/z-dev-toolbox-extension-v<version>.zip` and its unpacked sibling directory for local inspection.
+The release zip stores extension files at the archive root so extracting it does not add another nested `z-dev-toolbox-extension-v<version>` directory before you load it in the browser.
 GitHub Actions does not commit that directory; the release workflow builds the same zip in a temporary workspace path and uploads it directly as a release asset.
 
 The extension action opens the toolbox in its options page.
@@ -135,6 +136,12 @@ pnpm --filter @z-dev-toolbox/desktop tauri:build
 ```
 
 The desktop app uses Tauri and requires the usual system dependencies for your OS.
+
+If macOS reports that the app is damaged after you copy it into `/Applications`, run:
+
+```bash
+sudo xattr -d com.apple.quarantine /Applications/Z\ Dev\ Toolbox.app
+```
 
 ## Development Commands
 

@@ -80,17 +80,28 @@ const copyFile = (source, destination) => {
   cpSync(source, destination);
 };
 
-const zipDirectory = (directoryPath, zipPath) => {
+const zipDirectory = (directoryPath, zipPath, options = {}) => {
+  const { keepParent = true } = options;
   prepareDestination(zipPath);
 
-  if (process.platform === "darwin") {
+  if (process.platform === "darwin" && keepParent) {
     run("ditto", ["-c", "-k", "--norsrc", "--keepParent", directoryPath, zipPath]);
     return;
   }
 
-  // Keep a single top-level directory in the archive instead of embedding
-  // the absolute source path from CI workspaces.
-  run("zip", ["-rq", zipPath, basename(directoryPath)], dirname(directoryPath));
+  const zipInputs = keepParent ? [basename(directoryPath)] : readdirSync(directoryPath);
+
+  if (zipInputs.length === 0) {
+    throw new Error(`目录为空，无法生成压缩包: ${directoryPath}`);
+  }
+
+  // When keepParent is disabled, zip the directory contents directly so
+  // extracting the archive yields extension files immediately.
+  run(
+    "zip",
+    ["-rq", zipPath, ...zipInputs],
+    keepParent ? dirname(directoryPath) : directoryPath,
+  );
 };
 
 const findLatestMatchingFile = (directoryPath, matcher) => {
@@ -134,7 +145,9 @@ const packageExtension = () => {
   const targetZip = join(releaseRoot, `${releaseNames.extension}.zip`);
 
   copyDirectory(sourceDir, targetDir);
-  zipDirectory(targetDir, targetZip);
+  zipDirectory(targetDir, targetZip, {
+    keepParent: false,
+  });
 };
 
 const packageDesktop = () => {

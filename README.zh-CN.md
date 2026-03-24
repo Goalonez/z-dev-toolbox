@@ -116,6 +116,7 @@ pnpm package:extension
 ```
 
 默认会输出到 `release/v<version>/z-dev-toolbox-extension-v<version>.zip`，同时保留同名解包目录便于本地检查。
+发布 zip 的内部会直接放置插件文件，不再额外套一层 `z-dev-toolbox-extension-v<version>` 目录，解压后可以更直接地导入浏览器。
 GitHub Actions 不会提交这个目录；正式 release 工作流会在临时工作区内构建同样的 zip，然后直接上传为 release asset。
 
 点击插件图标时，会打开工具箱的 options 页面。
@@ -135,6 +136,12 @@ pnpm --filter @z-dev-toolbox/desktop tauri:build
 ```
 
 桌面端基于 Tauri，因此仍然依赖你当前操作系统对应的 Tauri 前置环境。
+
+如果 macOS 在你把应用拖到 `/Applications` 后提示“文件已损坏”，执行：
+
+```bash
+sudo xattr -d com.apple.quarantine /Applications/Z\ Dev\ Toolbox.app
+```
 
 ## 常用开发命令
 
