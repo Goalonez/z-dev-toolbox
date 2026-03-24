@@ -2,14 +2,31 @@
 
 [简体中文](./README.zh-CN.md)
 
-Z Dev Toolbox is a multi-platform developer toolbox for everyday engineering tasks.  
-It runs the same core experience on the web, in a Chrome extension, and in a desktop app, so you can use the same utilities wherever you work.
+Z Dev Toolbox is a local-first developer toolbox for everyday engineering tasks.
+It runs on the web, as a Chrome/Chromium extension, and as a desktop app, so you can keep the same set of utilities available wherever you work.
 
-The current app is local-first: there is no backend service in this repository, and preferences are stored locally in the current platform environment.
+There is no backend service in this repository. Preferences stay in the current platform environment.
 
-## What It Helps With
+## Screenshots
 
-Z Dev Toolbox currently includes tools for:
+| JSON Formatter | Regex |
+| --- | --- |
+| ![JSON Formatter](./assets/readme/json-formatter.png) | ![Regex](./assets/readme/regex.png) |
+| Format, inspect, and clean JSON before moving on to downstream conversions or debugging. | Test patterns, inspect matches, and preview replacements before you edit real files. |
+
+| QR Code | Time Converter |
+| --- | --- |
+| ![QR Code](./assets/readme/qr-code.png) | ![Time Converter](./assets/readme/time-converter.png) |
+| Generate or parse QR codes without leaving the toolbox. | Parse timestamps and datetime strings instantly across local time and UTC. |
+
+## Highlights
+
+- Local-first. No account, no hosted service, no repository-side backend.
+- Same toolbox across web, browser extension, and desktop.
+- Focused on practical utilities instead of a large plugin surface.
+- Designed for quick engineering workflows: paste, inspect, convert, copy, move on.
+
+## Included Tools
 
 - JSON formatting and validation
 - Format conversion between JSON, YAML, TOML, XML, CSV, properties, HTML, and HTTP
@@ -24,17 +41,13 @@ Z Dev Toolbox currently includes tools for:
 - Crontab preview
 - Snowflake ID generation
 
-## Available Apps
+## Get It
 
-- Web app: run the toolbox in a normal browser tab
-- Browser extension: use it as a Chrome/Chromium Manifest V3 extension
-- Desktop app: run the same toolbox in a Tauri desktop shell
+### Web
 
-## Quick Start
+The Docker image packages the web app only.
 
-The Docker image packages the web app only. Use the browser extension or desktop app when you need those distribution forms.
-
-### Docker Compose
+#### Docker Compose
 
 ```yaml
 services:
@@ -46,7 +59,7 @@ services:
     restart: unless-stopped
 ```
 
-### Docker Run
+#### Docker Run
 
 ```bash
 docker run -d \
@@ -58,15 +71,39 @@ docker run -d \
 
 Then open `http://localhost:8080`.
 
-If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.2`.
+If you want a fixed image tag, replace `latest` with a concrete release such as `goalonez/z-dev-toolbox:1.0.3`.
 
-## Use From Source
+### Browser Extension
+
+Release builds are published on [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases).
+
+If you download the extension zip from a release:
+
+1. Unzip it.
+2. Open `chrome://extensions` or `edge://extensions`.
+3. Enable Developer Mode.
+4. Click "Load unpacked" and select the extracted folder.
+
+### Desktop
+
+Desktop release assets for macOS, Windows, and Linux are also published on [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases).
+
+The current macOS build is not yet signed or notarized by Apple, so the first launch may show “app is damaged” or “developer cannot be verified”.
+If you trust that the app was downloaded from this project's release page, run the following command in Terminal and then open it again:
+
+```bash
+sudo xattr -d com.apple.quarantine "/Applications/Z Dev Toolbox.app"
+```
+
+## Run From Source
 
 ### Requirements
 
-- Node.js `24.14.0` (`.nvmrc` is the source of truth used by local development and GitHub Actions)
+- Node.js `24.14.0`
 - `pnpm@10`
 - Rust toolchain and Tauri prerequisites if you want to run the desktop app
+
+The repository keeps Node.js aligned with [`.nvmrc`](./.nvmrc), which is also used by GitHub Actions.
 
 Install dependencies:
 
@@ -74,85 +111,23 @@ Install dependencies:
 pnpm install
 ```
 
-### Web App
-
-Start the web development server:
+### Development
 
 ```bash
 pnpm dev:web
-```
-
-Vite usually serves the app at `http://localhost:5173`.
-
-Build the production web app:
-
-```bash
-pnpm build:web
-```
-
-The build output is written to `apps/web/dist`.
-
-### Browser Extension
-
-Start the extension development workflow:
-
-```bash
 pnpm dev:extension
-```
-
-Build a production extension package:
-
-```bash
-pnpm --filter @z-dev-toolbox/extension build
-```
-
-The unpacked production extension is generated in `apps/extension/build/chrome-mv3-prod`.  
-In Chrome or Edge, enable Developer Mode on `chrome://extensions` and load that directory as an unpacked extension.
-
-Build the release-style extension zip:
-
-```bash
-pnpm package:extension
-```
-
-By default, the script writes `release/v<version>/z-dev-toolbox-extension-v<version>.zip` and its unpacked sibling directory for local inspection.
-The release zip stores extension files at the archive root so extracting it does not add another nested `z-dev-toolbox-extension-v<version>` directory before you load it in the browser.
-GitHub Actions does not commit that directory; the release workflow builds the same zip in a temporary workspace path and uploads it directly as a release asset.
-
-The extension action opens the toolbox in its options page.
-
-### Desktop App
-
-Start the desktop app in development mode:
-
-```bash
 pnpm dev:desktop
 ```
 
-Build the desktop app:
+### Build
 
 ```bash
+pnpm build:web
+pnpm --filter @z-dev-toolbox/extension build
 pnpm --filter @z-dev-toolbox/desktop tauri:build
 ```
 
-The desktop app uses Tauri and requires the usual system dependencies for your OS.
-
-The current macOS app build is not yet signed or notarized by Apple, so the first launch may show “app is damaged” or “developer cannot be verified”.
-If you trust that the app was downloaded from this project's release page, run the following command in Terminal and then open it again:
-
-```bash
-sudo xattr -d com.apple.quarantine "/Applications/Z Dev Toolbox.app"
-```
-
-## Development Commands
-
-Run all workspace builds:
-
-```bash
-pnpm build
-```
-
-Run checks:
+### Verification
 
 ```bash
 pnpm lint
@@ -180,9 +155,6 @@ packages/
   storage/        Storage adapters
   tool-registry/  Tool manifests and panels
   ui/             Shared UI components
-
-scripts/
-  Build and repository utility scripts
 ```
 
 ## Thanks

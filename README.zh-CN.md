@@ -2,14 +2,31 @@
 
 [English](./README.md)
 
-Z Dev Toolbox 是一个面向日常开发场景的多端开发者工具箱。  
-它把同一套核心体验同时做成了 Web、浏览器插件和桌面端，方便你在不同工作环境里使用同一套小工具。
+Z Dev Toolbox 是一个面向日常开发场景的本地优先开发者工具箱。
+它同时提供 Web、浏览器插件和桌面端，让你在不同工作环境里都能使用同一套高频小工具。
 
-当前实现是本地优先的：这个仓库里没有后端服务，偏好设置也会保存在当前平台的本地环境中。
+这个仓库不包含后端服务，偏好设置保存在各自平台的本地环境中。
 
-## 能做什么
+## 界面示例
 
-目前内置的工具包括：
+| JSON 工具 | 正则表达式 |
+| --- | --- |
+| ![JSON Formatter](./assets/readme/json-formatter.png) | ![Regex](./assets/readme/regex.png) |
+| 先把 JSON 格式化、检查清楚，再继续做转换、调试或复制。 | 测试正则、查看匹配结果，并在真正改文件前先预览替换结果。 |
+
+| 二维码 | 时间转换 |
+| --- | --- |
+| ![QR Code](./assets/readme/qr-code.png) | ![Time Converter](./assets/readme/time-converter.png) |
+| 不离开工具箱即可生成或解析二维码。 | 快速解析时间戳和日期时间字符串，对照本地时间与 UTC。 |
+
+## 特点
+
+- 本地优先，不依赖账号、云端服务或仓库内后端。
+- Web、浏览器插件、桌面端共享同一套核心工具能力。
+- 聚焦开发中最常用的高频实用工具，而不是做成复杂的平台。
+- 适合“粘贴、处理、复制、继续工作”的轻量工程流。
+
+## 内置工具
 
 - JSON 格式化与校验
 - JSON、YAML、TOML、XML、CSV、properties、HTML、HTTP 之间的格式转换
@@ -24,17 +41,13 @@ Z Dev Toolbox 是一个面向日常开发场景的多端开发者工具箱。
 - Crontab 预览
 - 雪花 ID 生成
 
-## 可用端形态
+## 获取方式
 
-- Web：在浏览器标签页里直接使用
-- Browser Extension：作为 Chrome / Chromium Manifest V3 插件使用
-- Desktop：作为 Tauri 桌面应用使用
+### Web
 
-## 快速部署
+Docker 镜像只包含 Web 端。
 
-Docker 镜像只包含 Web 端。如果你需要浏览器插件或桌面端，请使用对应产物或源码构建方式。
-
-### Docker Compose
+#### Docker Compose
 
 ```yaml
 services:
@@ -46,7 +59,7 @@ services:
     restart: unless-stopped
 ```
 
-### Docker Run
+#### Docker Run
 
 ```bash
 docker run -d \
@@ -56,86 +69,24 @@ docker run -d \
   goalonez/z-dev-toolbox:latest
 ```
 
-启动后直接打开 `http://localhost:8080`。
+启动后打开 `http://localhost:8080`。
 
-如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.2`。
-
-## 从源码运行
-
-### 环境要求
-
-- Node.js `24.14.0`（本地开发与 GitHub Actions 统一以 `.nvmrc` 为准）
-- `pnpm@10`
-- 如果你要运行桌面端，还需要 Rust 工具链和 Tauri 运行前置依赖
-
-安装依赖：
-
-```bash
-pnpm install
-```
-
-### Web
-
-启动 Web 开发环境：
-
-```bash
-pnpm dev:web
-```
-
-Vite 默认通常会在 `http://localhost:5173` 提供访问。
-
-构建 Web 生产版本：
-
-```bash
-pnpm build:web
-```
-
-构建产物会输出到 `apps/web/dist`。
+如果你想固定镜像版本，把 `latest` 替换成具体 release，例如 `goalonez/z-dev-toolbox:1.0.3`。
 
 ### 浏览器插件
 
-启动插件开发流程：
+插件正式产物发布在 [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases)。
 
-```bash
-pnpm dev:extension
-```
+下载 release 里的插件 zip 后：
 
-构建生产插件：
-
-```bash
-pnpm --filter @z-dev-toolbox/extension build
-```
-
-解包后的生产插件目录位于 `apps/extension/build/chrome-mv3-prod`。  
-在 Chrome 或 Edge 中打开 `chrome://extensions`，开启开发者模式后即可加载这个目录。
-
-构建用于发布的插件 zip：
-
-```bash
-pnpm package:extension
-```
-
-默认会输出到 `release/v<version>/z-dev-toolbox-extension-v<version>.zip`，同时保留同名解包目录便于本地检查。
-发布 zip 的内部会直接放置插件文件，不再额外套一层 `z-dev-toolbox-extension-v<version>` 目录，解压后可以更直接地导入浏览器。
-GitHub Actions 不会提交这个目录；正式 release 工作流会在临时工作区内构建同样的 zip，然后直接上传为 release asset。
-
-点击插件图标时，会打开工具箱的 options 页面。
+1. 先解压。
+2. 打开 `chrome://extensions` 或 `edge://extensions`。
+3. 开启开发者模式。
+4. 选择“加载已解压的扩展程序”，然后选中解压后的目录。
 
 ### 桌面端
 
-启动桌面端开发环境：
-
-```bash
-pnpm dev:desktop
-```
-
-构建桌面端：
-
-```bash
-pnpm --filter @z-dev-toolbox/desktop tauri:build
-```
-
-桌面端基于 Tauri，因此仍然依赖你当前操作系统对应的 Tauri 前置环境。
+macOS、Windows、Linux 三个平台的桌面端产物同样发布在 [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases)。
 
 当前 macOS 版本的应用尚未完成 Apple 签名 / 公证，首次打开时系统可能提示“应用已损坏”或“无法验证开发者”。
 如果你确认安装包来自本项目发布页，可以在终端执行以下命令后再打开：
@@ -144,15 +95,39 @@ pnpm --filter @z-dev-toolbox/desktop tauri:build
 sudo xattr -d com.apple.quarantine "/Applications/Z Dev Toolbox.app"
 ```
 
-## 常用开发命令
+## 从源码运行
 
-执行整个工作区的构建：
+### 环境要求
+
+- Node.js `24.14.0`
+- `pnpm@10`
+- 如果你要运行桌面端，还需要 Rust 工具链和 Tauri 前置依赖
+
+仓库以 [`.nvmrc`](./.nvmrc) 作为 Node.js 版本基准，GitHub Actions 也使用同一版本。
+
+安装依赖：
 
 ```bash
-pnpm build
+pnpm install
 ```
 
-执行检查：
+### 开发命令
+
+```bash
+pnpm dev:web
+pnpm dev:extension
+pnpm dev:desktop
+```
+
+### 构建命令
+
+```bash
+pnpm build:web
+pnpm --filter @z-dev-toolbox/extension build
+pnpm --filter @z-dev-toolbox/desktop tauri:build
+```
+
+### 校验命令
 
 ```bash
 pnpm lint
@@ -180,9 +155,6 @@ packages/
   storage/        存储适配
   tool-registry/  工具清单与面板实现
   ui/             共享 UI 组件
-
-scripts/
-  构建与仓库辅助脚本
 ```
 
 ## 感谢支持
