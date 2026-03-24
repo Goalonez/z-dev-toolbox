@@ -30,6 +30,36 @@ Z Dev Toolbox 是一个面向日常开发场景的多端开发者工具箱。
 - Browser Extension：作为 Chrome / Chromium Manifest V3 插件使用
 - Desktop：作为 Tauri 桌面应用使用
 
+## 快速部署
+
+Docker 镜像只包含 Web 端。如果你需要浏览器插件或桌面端，请使用对应产物或源码构建方式。
+
+### Docker Compose
+
+```yaml
+services:
+  z-dev-toolbox:
+    image: goalonez/z-dev-toolbox:latest
+    container_name: z-dev-toolbox
+    ports:
+      - 8080:80
+    restart: unless-stopped
+```
+
+### Docker Run
+
+```bash
+docker run -d \
+  --name z-dev-toolbox \
+  -p 8080:80 \
+  --restart unless-stopped \
+  goalonez/z-dev-toolbox:latest
+```
+
+启动后直接打开 `http://localhost:8080`。
+
+如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.0`。
+
 ## 从源码运行
 
 ### 环境要求
@@ -137,6 +167,10 @@ packages/
 scripts/
   构建与仓库辅助脚本
 ```
+
+## 感谢支持
+
+感谢 OpenAI Codex 和 Claude 在实现、迭代与文档整理过程中提供的支持。
 
 ## 许可证
 

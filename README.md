@@ -30,6 +30,36 @@ Z Dev Toolbox currently includes tools for:
 - Browser extension: use it as a Chrome/Chromium Manifest V3 extension
 - Desktop app: run the same toolbox in a Tauri desktop shell
 
+## Quick Start
+
+The Docker image packages the web app only. Use the browser extension or desktop app when you need those distribution forms.
+
+### Docker Compose
+
+```yaml
+services:
+  z-dev-toolbox:
+    image: goalonez/z-dev-toolbox:latest
+    container_name: z-dev-toolbox
+    ports:
+      - 8080:80
+    restart: unless-stopped
+```
+
+### Docker Run
+
+```bash
+docker run -d \
+  --name z-dev-toolbox \
+  -p 8080:80 \
+  --restart unless-stopped \
+  goalonez/z-dev-toolbox:latest
+```
+
+Then open `http://localhost:8080`.
+
+If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.0`.
+
 ## Use From Source
 
 ### Requirements
@@ -137,6 +167,10 @@ packages/
 scripts/
   Build and repository utility scripts
 ```
+
+## Thanks
+
+Thanks to OpenAI Codex and Claude for supporting implementation, iteration, and documentation work on this project.
 
 ## License
 
