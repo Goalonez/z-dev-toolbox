@@ -137,10 +137,11 @@ pnpm --filter @z-dev-toolbox/desktop tauri:build
 
 桌面端基于 Tauri，因此仍然依赖你当前操作系统对应的 Tauri 前置环境。
 
-如果 macOS 在你把应用拖到 `/Applications` 后提示“文件已损坏”，执行：
+当前 macOS 版本的应用尚未完成 Apple 签名 / 公证，首次打开时系统可能提示“应用已损坏”或“无法验证开发者”。
+如果你确认安装包来自本项目发布页，可以在终端执行以下命令后再打开：
 
 ```bash
-sudo xattr -d com.apple.quarantine /Applications/Z\ Dev\ Toolbox.app
+sudo xattr -d com.apple.quarantine "/Applications/Z Dev Toolbox.app"
 ```
 
 ## 常用开发命令

@@ -137,10 +137,11 @@ pnpm --filter @z-dev-toolbox/desktop tauri:build
 
 The desktop app uses Tauri and requires the usual system dependencies for your OS.
 
-If macOS reports that the app is damaged after you copy it into `/Applications`, run:
+The current macOS app build is not yet signed or notarized by Apple, so the first launch may show “app is damaged” or “developer cannot be verified”.
+If you trust that the app was downloaded from this project's release page, run the following command in Terminal and then open it again:
 
 ```bash
-sudo xattr -d com.apple.quarantine /Applications/Z\ Dev\ Toolbox.app
+sudo xattr -d com.apple.quarantine "/Applications/Z Dev Toolbox.app"
 ```
 
 ## Development Commands
