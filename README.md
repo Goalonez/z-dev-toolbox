@@ -58,7 +58,7 @@ docker run -d \
 
 Then open `http://localhost:8080`.
 
-If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.0`.
+If you want a fixed release, replace `latest` with a concrete tag such as `goalonez/z-dev-toolbox:1.0.1`.
 
 ## Use From Source
 

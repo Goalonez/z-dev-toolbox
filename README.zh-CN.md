@@ -58,7 +58,7 @@ docker run -d \
 
 启动后直接打开 `http://localhost:8080`。
 
-如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.0`。
+如果你希望固定版本部署，把 `latest` 替换成具体版本号，例如 `goalonez/z-dev-toolbox:1.0.1`。
 
 ## 从源码运行
 
