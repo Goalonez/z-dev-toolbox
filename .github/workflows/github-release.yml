@@ -1,0 +1,218 @@
+name: Publish GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      channel: ${{ steps.release.outputs.channel }}
+      publish_extension: ${{ steps.release.outputs.publish_extension }}
+      publish_desktop: ${{ steps.release.outputs.publish_desktop }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse release tag
+        id: release
+        run: bash .github/scripts/parse-release-tag.sh
+
+      - name: Ensure release tag points to main
+        run: |
+          if ! git branch -r --contains "${GITHUB_SHA}" | grep -q 'origin/main$'; then
+            echo "Release tags must point to commits reachable from origin/main." >&2
+            exit 1
+          fi
+
+      - name: Validate package version
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); if (pkg.version !== process.env.RELEASE_VERSION) { console.error('package.json version ' + pkg.version + ' does not match release version ' + process.env.RELEASE_VERSION); process.exit(1); }"
+
+      - name: Validate release notes
+        run: |
+          test -f "release-notes/${{ steps.release.outputs.tag }}.md"
+
+  build-extension:
+    needs: prepare
+    if: needs.prepare.outputs.publish_extension == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check synced versions
+        run: pnpm check:versions
+
+      - name: Build extension
+        run: pnpm --filter @z-dev-toolbox/extension build
+
+      - name: Prepare extension asset
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p release-assets
+          cp \
+            "apps/extension/build/chrome-mv3-prod.zip" \
+            "release-assets/z-dev-toolbox-extension-v${RELEASE_VERSION}.zip"
+
+      - name: Upload extension asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-release-assets
+          path: release-assets/*.zip
+          if-no-files-found: error
+
+  build-desktop:
+    needs: prepare
+    if: needs.prepare.outputs.publish_desktop == 'true'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            bundle: dmg
+          - runner: windows-latest
+            bundle: nsis
+          - runner: ubuntu-22.04
+            bundle: appimage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux desktop dependencies
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check synced versions
+        run: pnpm check:versions
+
+      - name: Build desktop bundle
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop/src-tauri
+          tauriScript: pnpm --filter @z-dev-toolbox/desktop exec tauri
+          args: --bundles ${{ matrix.bundle }}
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: desktop-[platform]-[bundle]
+
+  publish-release:
+    needs:
+      - prepare
+      - build-extension
+      - build-desktop
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.build-extension.result == 'success' || needs.build-extension.result == 'skipped') &&
+      (needs.build-desktop.result == 'success' || needs.build-desktop.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download extension asset
+        if: needs.prepare.outputs.publish_extension == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-release-assets
+          path: release-assets/raw/extension
+
+      - name: Download desktop assets
+        if: needs.prepare.outputs.publish_desktop == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release-assets/raw
+
+      - name: Normalize release assets
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          node ./scripts/normalize-release-assets.mjs \
+            --version "${RELEASE_VERSION}" \
+            --source-dir "release-assets/raw" \
+            --output-dir "release-assets/final"
+
+      - name: Count release assets
+        id: assets
+        run: |
+          shopt -s nullglob
+          files=(release-assets/final/*)
+          echo "count=${#files[@]}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release with assets
+        if: steps.assets.outputs.count != '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes/${{ needs.prepare.outputs.tag }}.md
+          files: release-assets/final/*
+          fail_on_unmatched_files: true
+
+      - name: Publish GitHub release notes
+        if: steps.assets.outputs.count == '0'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes/${{ needs.prepare.outputs.tag }}.md

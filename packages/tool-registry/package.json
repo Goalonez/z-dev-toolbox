@@ -1,0 +1,24 @@
+{
+  "name": "@z-dev-toolbox/tool-registry",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@z-dev-toolbox/core": "workspace:*",
+    "@z-dev-toolbox/platform": "workspace:*",
+    "@z-dev-toolbox/shared": "workspace:*",
+    "@z-dev-toolbox/storage": "workspace:*",
+    "@z-dev-toolbox/ui": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

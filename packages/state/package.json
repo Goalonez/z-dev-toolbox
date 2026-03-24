@@ -1,0 +1,19 @@
+{
+  "name": "@z-dev-toolbox/state",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@z-dev-toolbox/shared": "workspace:*",
+    "zustand": "^5.0.1"
+  }
+}

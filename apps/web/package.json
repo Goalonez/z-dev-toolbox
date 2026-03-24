@@ -1,0 +1,21 @@
+{
+  "name": "@z-dev-toolbox/web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "package": "node ../../scripts/package-distributables.mjs web",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@z-dev-toolbox/app-shell": "workspace:*",
+    "@z-dev-toolbox/platform": "workspace:*",
+    "@z-dev-toolbox/storage": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

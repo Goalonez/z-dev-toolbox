@@ -1,0 +1,35 @@
+{
+  "name": "@z-dev-toolbox/extension",
+  "displayName": "Z Dev Toolbox",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "plasmo dev --src-path=.",
+    "build": "plasmo build --src-path=.",
+    "package": "node ../../scripts/package-distributables.mjs extension",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@z-dev-toolbox/app-shell": "workspace:*",
+    "@z-dev-toolbox/platform": "workspace:*",
+    "@z-dev-toolbox/storage": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "plasmo": "^0.90.4"
+  },
+  "manifest": {
+    "name": "Z Dev Toolbox",
+    "action": {
+      "default_title": "Z Dev Toolbox"
+    },
+    "permissions": [
+      "storage"
+    ],
+    "host_permissions": []
+  }
+}

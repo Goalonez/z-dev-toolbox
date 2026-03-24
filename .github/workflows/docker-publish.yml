@@ -1,0 +1,84 @@
+name: Publish Web Docker Image
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  IMAGE_NAME: goalonez/z-dev-toolbox
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Parse release tag
+        id: release
+        run: bash .github/scripts/parse-release-tag.sh
+
+      - name: Ensure release tag points to main
+        if: steps.release.outputs.publish_web == 'true'
+        run: |
+          if ! git branch -r --contains "${GITHUB_SHA}" | grep -q 'origin/main$'; then
+            echo "Release tags must point to commits reachable from origin/main." >&2
+            exit 1
+          fi
+
+      - name: Validate package version
+        if: steps.release.outputs.publish_web == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); if (pkg.version !== process.env.RELEASE_VERSION) { console.error('package.json version ' + pkg.version + ' does not match release version ' + process.env.RELEASE_VERSION); process.exit(1); }"
+
+      - name: Set up Docker Buildx
+        if: steps.release.outputs.publish_web == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.release.outputs.publish_web == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare image tags
+        if: steps.release.outputs.publish_web == 'true'
+        id: meta
+        env:
+          PUBLISH_LATEST_IMAGE: ${{ steps.release.outputs.publish_latest_image }}
+        run: |
+          tags=(
+            "${IMAGE_NAME}:${{ steps.release.outputs.version }}"
+            "${IMAGE_NAME}:${{ steps.release.outputs.major_minor }}"
+          )
+
+          if [[ "${PUBLISH_LATEST_IMAGE}" == "true" ]]; then
+            tags+=("${IMAGE_NAME}:latest")
+          fi
+
+          {
+            echo 'tags<<EOF'
+            printf '%s\n' "${tags[@]}"
+            echo 'EOF'
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push
+        if: steps.release.outputs.publish_web == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

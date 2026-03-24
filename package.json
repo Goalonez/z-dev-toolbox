@@ -1,0 +1,48 @@
+{
+  "name": "z-dev-toolbox",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "audit:repo": "node ./scripts/check-public-repo.mjs",
+    "check:versions": "node ./scripts/sync-versions.mjs --check",
+    "sync:versions": "node ./scripts/sync-versions.mjs --write",
+    "sync:branding": "node ./scripts/sync-brand-assets.mjs",
+    "dev:web": "pnpm --filter @z-dev-toolbox/web dev",
+    "dev:extension": "pnpm --filter @z-dev-toolbox/extension dev",
+    "dev:desktop": "pnpm --filter @z-dev-toolbox/desktop tauri:dev",
+    "build": "turbo run build",
+    "build:web": "pnpm --filter @z-dev-toolbox/web build",
+    "package:web": "pnpm check:versions && node ./scripts/package-distributables.mjs web",
+    "package:extension": "pnpm check:versions && node ./scripts/package-distributables.mjs extension",
+    "package:desktop": "pnpm check:versions && node ./scripts/package-distributables.mjs desktop",
+    "package:all": "pnpm check:versions && node ./scripts/package-distributables.mjs all",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "@vitejs/plugin-react-swc": "^3.7.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.16",
+    "globals": "^15.14.0",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^3.4.17",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

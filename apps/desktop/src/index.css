@@ -1,0 +1,5 @@
+@import "../../../packages/app-shell/src/theme.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
