@@ -2,7 +2,7 @@
   "name": "@z-dev-toolbox/extension",
   "displayName": "Z Dev Toolbox",
   "private": true,
-  "version": "1.0.11",
+  "version": "1.0.12",
   "type": "module",
   "scripts": {
     "dev": "plasmo dev --src-path=.",

@@ -255,6 +255,7 @@ if (!targetArch) {
 
 const outputDir = `${outputRoot}/desktop-${platformConfig.platformKey}`;
 const desktopExtension = getOutputExtension(sourceFile);
+const signatureExtension = getOutputExtension(updaterFile ?? sourceFile);
 
 copyAsset(
   sourceFile,
@@ -272,5 +273,5 @@ if (updaterFile) {
 
 copyAsset(
   updaterSignature,
-  `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${desktopExtension}.sig`,
+  `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${signatureExtension}.sig`,
 );

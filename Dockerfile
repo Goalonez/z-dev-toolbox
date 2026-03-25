@@ -1,4 +1,4 @@
-FROM node:24.14.0-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:24.14.0-alpine AS builder
 
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
