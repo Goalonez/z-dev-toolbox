@@ -1,3 +1,4 @@
+/* global console, process */
 import {
   existsSync,
   mkdirSync,
@@ -91,6 +92,11 @@ const updaterPattern = new RegExp(
   "iu",
 );
 
+const desktopPattern = new RegExp(
+  `^z-dev-toolbox-desktop-(macos|windows|linux)-v${escapeRegExp(version)}(\\.dmg|\\.exe|\\.AppImage)$`,
+  "iu",
+);
+
 const files = walkFiles(inputDir);
 const platforms = new Map();
 
@@ -102,14 +108,13 @@ for (const filePath of files) {
     continue;
   }
 
-  const [, platformKey, arch, extension, signatureSuffix] = match;
+  const [, platformKey, arch, , signatureSuffix] = match;
   const key = `${platformKey}:${arch}`;
   const current = platforms.get(key) ?? {
     platformKey,
     arch,
     asset: null,
     signature: null,
-    extension,
   };
 
   if (signatureSuffix) {
@@ -119,6 +124,29 @@ for (const filePath of files) {
   }
 
   platforms.set(key, current);
+}
+
+for (const filePath of files) {
+  const fileName = basename(filePath);
+  const match = fileName.match(desktopPattern);
+
+  if (!match) {
+    continue;
+  }
+
+  const [, platformKey] = match;
+
+  if (platformKey === "macos") {
+    continue;
+  }
+
+  for (const entry of platforms.values()) {
+    if (entry.platformKey !== platformKey || entry.asset) {
+      continue;
+    }
+
+    entry.asset = filePath;
+  }
 }
 
 if (platforms.size === 0) {

@@ -162,13 +162,13 @@ const platformConfigs = {
     platformKey: "windows",
     sourceDirPattern: /[\\/]nsis[\\/]/iu,
     sourceMatchers: [/-setup\.exe$/iu, /\.exe$/iu, /\.msi$/iu],
-    updaterFromSource: true,
+    updaterSignatureFromSource: true,
   },
   "ubuntu-22.04": {
     platformKey: "linux",
     sourceDirPattern: /[\\/]appimage[\\/]/u,
     sourceMatchers: [/\.AppImage$/u],
-    updaterFromSource: true,
+    updaterSignatureFromSource: true,
   },
 };
 
@@ -211,9 +211,7 @@ if (!sourceFile) {
 
 let updaterFile = null;
 
-if (platformConfig.updaterFromSource) {
-  updaterFile = sourceFile;
-} else {
+if (!platformConfig.updaterSignatureFromSource) {
   const updaterFiles = allFiles.filter((filePath) =>
     platformConfig.updaterDirPattern.test(filePath),
   );
@@ -232,7 +230,7 @@ if (platformConfig.updaterFromSource) {
   }
 }
 
-const updaterSignature = `${updaterFile}.sig`;
+const updaterSignature = `${(updaterFile ?? sourceFile)}.sig`;
 
 if (!existsSync(updaterSignature)) {
   console.error(
@@ -257,17 +255,22 @@ if (!targetArch) {
 
 const outputDir = `${outputRoot}/desktop-${platformConfig.platformKey}`;
 const desktopExtension = getOutputExtension(sourceFile);
-const updaterExtension = getOutputExtension(updaterFile);
 
 copyAsset(
   sourceFile,
   `${outputDir}/z-dev-toolbox-desktop-${platformConfig.platformKey}-v${version}${desktopExtension}`,
 );
-copyAsset(
-  updaterFile,
-  `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${updaterExtension}`,
-);
+
+if (updaterFile) {
+  const updaterExtension = getOutputExtension(updaterFile);
+
+  copyAsset(
+    updaterFile,
+    `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${updaterExtension}`,
+  );
+}
+
 copyAsset(
   updaterSignature,
-  `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${updaterExtension}.sig`,
+  `${outputDir}/z-dev-toolbox-updater-${platformConfig.platformKey}-${targetArch}-v${version}${desktopExtension}.sig`,
 );
