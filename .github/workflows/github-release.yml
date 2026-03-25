@@ -158,7 +158,7 @@ jobs:
         with:
           projectPath: apps/desktop/src-tauri
           tauriScript: pnpm --filter @z-dev-toolbox/desktop exec tauri
-          args: --bundles ${{ matrix.bundle }} --config tauri.release.conf.json
+          args: --bundles ${{ matrix.bundle }} --config src-tauri/tauri.release.conf.json
 
       - name: Prepare desktop artifact
         env:
