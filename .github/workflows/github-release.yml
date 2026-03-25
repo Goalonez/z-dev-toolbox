@@ -92,11 +92,14 @@ jobs:
       matrix:
         include:
           - runner: macos-latest
-            bundle: dmg
+            bundle: app,dmg
+            artifact_name: macos-app-dmg
           - runner: windows-latest
             bundle: nsis
+            artifact_name: windows-nsis
           - runner: ubuntu-22.04
             bundle: appimage
+            artifact_name: linux-appimage
 
     steps:
       - name: Checkout
@@ -174,7 +177,7 @@ jobs:
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v6
         with:
-          name: desktop-${{ matrix.runner }}-${{ matrix.bundle }}
+          name: desktop-${{ matrix.artifact_name }}
           path: release-assets/desktop-*/*
           if-no-files-found: error
 
