@@ -4,7 +4,7 @@ import {
   mkdirSync,
   readdirSync,
 } from "node:fs";
-import { dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -96,6 +96,16 @@ const extensionZip =
 
 if (extensionZip) {
   copyAsset(extensionZip, `z-dev-toolbox-extension-v${version}.zip`);
+}
+
+for (const filePath of allFiles) {
+  const fileName = basename(filePath);
+
+  if (!fileName.startsWith("z-dev-toolbox-updater-")) {
+    continue;
+  }
+
+  copyAsset(filePath, fileName);
 }
 
 for (const entry of topLevelEntries) {

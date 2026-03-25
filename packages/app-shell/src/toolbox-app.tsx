@@ -6,7 +6,11 @@ import {
   useState,
 } from "react";
 
-import type { PlatformBridge } from "@z-dev-toolbox/platform";
+import type {
+  AppUpdateInfo,
+  AppUpdateStatus,
+  PlatformBridge,
+} from "@z-dev-toolbox/platform";
 import type {
   Locale,
   ThemeMode,
@@ -24,6 +28,8 @@ import {
 import { Button, Card, Input, cn } from "@z-dev-toolbox/ui";
 
 const PREFERENCES_KEY = "shell:preferences";
+const UPDATE_DISMISSED_VERSION_KEY = "shell:update-dismissed-version";
+const UPDATE_CHECK_TIMEOUT_MS = 8000;
 const REPOSITORY_URL = "https://github.com/Goalonez/z-dev-toolbox";
 
 interface ToolboxAppProps {
@@ -42,6 +48,21 @@ interface LocalizedManifest {
 interface ToastState extends ToolPanelNotification {
   id: number;
 }
+
+type UpdateViewStatus = AppUpdateStatus | "idle" | "checking" | "installing";
+
+interface UpdateState {
+  currentVersion: string;
+  status: UpdateViewStatus;
+  update: AppUpdateInfo | null;
+  message?: string;
+}
+
+const initialUpdateState: UpdateState = {
+  currentVersion: "",
+  status: "idle",
+  update: null,
+};
 
 const isWorkspaceEditable = (root: HTMLDivElement | null) => {
   const activeElement = document.activeElement;
@@ -75,6 +96,28 @@ const shellCopy: Record<
     themeLabel: string;
     autoCopyLabel: string;
     autoCopyDescription: string;
+    updateSectionTitle: string;
+    updateSectionDescription: string;
+    checkUpdatesLabel: string;
+    checkingUpdatesLabel: string;
+    installUpdateLabel: string;
+    installingUpdateLabel: string;
+    dismissUpdateLabel: string;
+    updatePromptTitle: string;
+    currentVersionLabel: string;
+    availableVersionLabel: string;
+    releaseDateLabel: string;
+    releaseNotesLabel: string;
+    releaseNotesEmpty: string;
+    updateStatusIdle: string;
+    updateStatusChecking: string;
+    updateStatusLatest: string;
+    updateStatusAvailable: string;
+    updateStatusOffline: string;
+    updateStatusUnsupported: string;
+    updateStatusError: string;
+    updateDismissedHint: string;
+    updateInstallFailed: string;
   }
 > = {
   "zh-CN": {
@@ -92,6 +135,29 @@ const shellCopy: Record<
     themeLabel: "切换夜间模式",
     autoCopyLabel: "自动复制结果",
     autoCopyDescription: "执行工具后自动把结果写入剪贴板。",
+    updateSectionTitle: "应用更新",
+    updateSectionDescription: "启动时自动检查 GitHub Release，也可以在这里手动检查。",
+    checkUpdatesLabel: "检查更新",
+    checkingUpdatesLabel: "检查中...",
+    installUpdateLabel: "立即更新",
+    installingUpdateLabel: "更新中...",
+    dismissUpdateLabel: "关闭提示",
+    updatePromptTitle: "发现新版本",
+    currentVersionLabel: "当前版本",
+    availableVersionLabel: "可用版本",
+    releaseDateLabel: "发布时间",
+    releaseNotesLabel: "Release Notes",
+    releaseNotesEmpty: "该版本没有附带更新说明。",
+    updateStatusIdle: "可以在这里手动检查 GitHub Release 上的最新版本。",
+    updateStatusChecking: "正在检查 GitHub Release 上的最新版本。",
+    updateStatusLatest: "当前已经是最新版本。",
+    updateStatusAvailable: "检测到可用新版本。",
+    updateStatusOffline: "当前无法连接到网络或 GitHub，稍后可再试。",
+    updateStatusUnsupported:
+      "当前构建未启用自动更新。请先配置 updater 公钥和签名密钥。",
+    updateStatusError: "更新检查失败，请稍后重试。",
+    updateDismissedHint: "这个版本的启动提醒已关闭，但仍可在这里手动更新。",
+    updateInstallFailed: "更新安装失败，请稍后重试。",
   },
   "en-US": {
     projectName: "Z Dev Toolbox",
@@ -109,6 +175,32 @@ const shellCopy: Record<
     autoCopyLabel: "Auto copy result",
     autoCopyDescription:
       "Copy tool output to clipboard automatically after execution.",
+    updateSectionTitle: "App updates",
+    updateSectionDescription:
+      "Check GitHub Releases automatically on launch or run a manual check here.",
+    checkUpdatesLabel: "Check for updates",
+    checkingUpdatesLabel: "Checking...",
+    installUpdateLabel: "Update now",
+    installingUpdateLabel: "Installing...",
+    dismissUpdateLabel: "Close prompt",
+    updatePromptTitle: "Update available",
+    currentVersionLabel: "Current version",
+    availableVersionLabel: "Available version",
+    releaseDateLabel: "Published",
+    releaseNotesLabel: "Release notes",
+    releaseNotesEmpty: "This release does not include notes.",
+    updateStatusIdle: "Run a manual check here to query the latest GitHub Release.",
+    updateStatusChecking: "Checking the latest version from GitHub Releases.",
+    updateStatusLatest: "You are already on the latest version.",
+    updateStatusAvailable: "A newer version is available.",
+    updateStatusOffline:
+      "GitHub or the network is currently unavailable. Try again later.",
+    updateStatusUnsupported:
+      "This build does not have auto-update enabled yet. Configure the updater public key and signing key first.",
+    updateStatusError: "Failed to check for updates. Please try again later.",
+    updateDismissedHint:
+      "Startup reminders for this version are disabled, but you can still update manually here.",
+    updateInstallFailed: "Failed to install the update. Please try again later.",
   },
 };
 
@@ -141,6 +233,31 @@ const getSearchText = (manifest: ToolManifest, locale: Locale) => {
   ]
     .join(" ")
     .toLowerCase();
+};
+
+const readErrorMessage = (error: unknown) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+};
+
+const formatUpdateDate = (value: string | undefined, locale: Locale) => {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
 };
 
 const GitHubIcon = () => (
@@ -299,10 +416,16 @@ const ToastIcon = ({ tone }: { tone: ToolPanelNotification["tone"] }) => {
 export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
   const [hydrated, setHydrated] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<
+    string | null
+  >(null);
+  const [updateState, setUpdateState] = useState<UpdateState>(initialUpdateState);
   const [toast, setToast] = useState<ToastState | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const startupUpdateCheckDoneRef = useRef(false);
   const search = useToolboxStore((state) => state.search);
   const selectedToolId = useToolboxStore((state) => state.selectedToolId);
   const recent = useToolboxStore((state) => state.recent);
@@ -320,6 +443,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
   );
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const text = shellCopy[locale];
+  const isDesktopPlatform = platform === "desktop";
 
   const availableTools = toolRegistry.filter((tool) =>
     tool.manifest.platforms.includes(platform),
@@ -415,17 +539,100 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
     }, 2200);
   }, []);
 
+  const dismissAvailableUpdatePrompt = useCallback(async () => {
+    const targetVersion = updateState.update?.version;
+
+    if (!targetVersion) {
+      setIsUpdatePromptOpen(false);
+      return;
+    }
+
+    await storage.setItem(UPDATE_DISMISSED_VERSION_KEY, targetVersion);
+    setDismissedUpdateVersion(targetVersion);
+    setIsUpdatePromptOpen(false);
+  }, [storage, updateState.update?.version]);
+
+  const runUpdateCheck = useCallback(
+    async (reason: "startup" | "manual") => {
+      setUpdateState((current) => ({
+        ...current,
+        status: "checking",
+        message: undefined,
+      }));
+
+      const result = await bridge.checkForAppUpdate({
+        timeoutMs: UPDATE_CHECK_TIMEOUT_MS,
+      });
+
+      setUpdateState({
+        currentVersion: result.currentVersion,
+        status: result.status,
+        update: result.update,
+        message: result.message,
+      });
+
+      if (
+        result.status === "available" &&
+        result.update &&
+        reason === "startup" &&
+        result.update.version !== dismissedUpdateVersion
+      ) {
+        setIsUpdatePromptOpen(true);
+        return;
+      }
+
+      if (reason === "startup") {
+        setIsUpdatePromptOpen(false);
+      }
+    },
+    [bridge, dismissedUpdateVersion],
+  );
+
+  const installAvailableUpdate = useCallback(async () => {
+    if (!updateState.update) {
+      return;
+    }
+
+    setUpdateState((current) => ({
+      ...current,
+      status: "installing",
+      message: undefined,
+    }));
+
+    try {
+      await bridge.installAppUpdate();
+    } catch (error) {
+      const message = readErrorMessage(error);
+
+      setUpdateState((current) => ({
+        ...current,
+        status: current.update ? "available" : "error",
+        message,
+      }));
+      notify({
+        tone: "error",
+        text: text.updateInstallFailed,
+      });
+    }
+  }, [bridge, notify, text.updateInstallFailed, updateState.update]);
+
   useEffect(() => {
     let cancelled = false;
 
     const loadPreferences = async () => {
-      const saved = await storage.getItem<ToolboxPreferences>(PREFERENCES_KEY);
+      const [saved, savedDismissedVersion] = await Promise.all([
+        storage.getItem<ToolboxPreferences>(PREFERENCES_KEY),
+        isDesktopPlatform
+          ? storage.getItem<string>(UPDATE_DISMISSED_VERSION_KEY)
+          : Promise.resolve<string | null>(null),
+      ]);
 
       if (cancelled) {
         return;
       }
 
       hydrate(saved ?? defaultPreferences);
+      setDismissedUpdateVersion(savedDismissedVersion);
       setHydrated(true);
     };
 
@@ -434,7 +641,34 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
     return () => {
       cancelled = true;
     };
-  }, [hydrate, storage]);
+  }, [hydrate, isDesktopPlatform, storage]);
+
+  useEffect(() => {
+    if (!hydrated || !isDesktopPlatform) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadVersion = async () => {
+      const currentVersion = await bridge.getAppVersion();
+
+      if (cancelled) {
+        return;
+      }
+
+      setUpdateState((current) => ({
+        ...current,
+        currentVersion: current.currentVersion || currentVersion,
+      }));
+    };
+
+    void loadVersion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bridge, hydrated, isDesktopPlatform]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
@@ -487,10 +721,29 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
   }, [focusSearchInput, hydrated]);
 
   useEffect(() => {
+    if (!hydrated || !isDesktopPlatform || startupUpdateCheckDoneRef.current) {
+      return;
+    }
+
+    startupUpdateCheckDoneRef.current = true;
+    void runUpdateCheck("startup");
+  }, [hydrated, isDesktopPlatform, runUpdateCheck]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         focusSearchInput();
+        return;
+      }
+
+      if (event.key === "Escape" && isUpdatePromptOpen) {
+        event.preventDefault();
+
+        if (updateState.status !== "installing") {
+          void dismissAvailableUpdatePrompt();
+        }
+
         return;
       }
 
@@ -545,7 +798,13 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [focusSearchInput, isSettingsOpen]);
+  }, [
+    dismissAvailableUpdatePrompt,
+    focusSearchInput,
+    isSettingsOpen,
+    isUpdatePromptOpen,
+    updateState.status,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -559,6 +818,29 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
   const selectedToolName = selectedTool
     ? getLocalizedManifest(selectedTool.manifest, locale).name
     : "";
+  const availableUpdate = updateState.update;
+  const updateReleaseDate = formatUpdateDate(availableUpdate?.date, locale);
+  const updateNotes = availableUpdate?.body?.trim() || null;
+  const hasDismissedAvailableUpdate =
+    dismissedUpdateVersion !== null &&
+    dismissedUpdateVersion === availableUpdate?.version;
+
+  const updateStatusText =
+    updateState.status === "idle"
+      ? text.updateStatusIdle
+      : updateState.status === "checking"
+      ? text.updateStatusChecking
+      : updateState.status === "available"
+        ? text.updateStatusAvailable
+        : updateState.status === "offline"
+          ? text.updateStatusOffline
+          : updateState.status === "unsupported"
+            ? text.updateStatusUnsupported
+            : updateState.status === "error"
+              ? text.updateStatusError
+              : updateState.status === "installing"
+                ? text.installingUpdateLabel
+                : text.updateStatusLatest;
 
   return (
     <div className="min-h-dvh h-dvh overflow-hidden bg-background bg-shell-grid bg-[size:36px_36px] text-foreground">
@@ -874,7 +1156,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                 ×
               </Button>
             </div>
-            <div className="px-4 py-4">
+            <div className="space-y-3 px-4 py-4">
               <button
                 className="group flex w-full items-center justify-between gap-4 rounded-[24px] border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.96),rgb(var(--color-surface-strong)/0.92))] px-4 py-4 text-left shadow-[0_18px_32px_-28px_rgb(var(--color-shadow-ambient)/0.3)] transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-accent/18 hover:shadow-[0_22px_38px_-28px_rgb(var(--color-shadow-ambient)/0.36),0_8px_20px_-16px_rgb(var(--color-shadow-warm)/0.16)]"
                 type="button"
@@ -906,6 +1188,171 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                   />
                 </span>
               </button>
+              {isDesktopPlatform ? (
+                <div className="rounded-[24px] border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.96),rgb(var(--color-surface-strong)/0.92))] px-4 py-4 shadow-[0_18px_32px_-28px_rgb(var(--color-shadow-ambient)/0.3)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">
+                        {text.updateSectionTitle}
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-muted">
+                        {text.updateSectionDescription}
+                      </div>
+                    </div>
+                    <Button
+                      className="h-9 shrink-0 px-3"
+                      size="sm"
+                      variant="secondary"
+                      disabled={
+                        updateState.status === "checking" ||
+                        updateState.status === "installing"
+                      }
+                      onClick={() => {
+                        void runUpdateCheck("manual");
+                      }}
+                    >
+                      {updateState.status === "checking"
+                        ? text.checkingUpdatesLabel
+                        : text.checkUpdatesLabel}
+                    </Button>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[18px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-3.5 py-3">
+                      <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                        {text.currentVersionLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-medium text-foreground">
+                        {updateState.currentVersion || "..."}
+                      </div>
+                    </div>
+                    <div className="rounded-[18px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-3.5 py-3">
+                      <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                        {text.availableVersionLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-medium text-foreground">
+                        {availableUpdate?.version ?? "--"}
+                      </div>
+                      {updateReleaseDate ? (
+                        <div className="mt-1 text-[11px] leading-5 text-muted">
+                          {text.releaseDateLabel}: {updateReleaseDate}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+                    <div className="text-sm font-medium text-foreground">
+                      {updateStatusText}
+                    </div>
+                    {hasDismissedAvailableUpdate ? (
+                      <div className="mt-1 text-xs leading-5 text-muted">
+                        {text.updateDismissedHint}
+                      </div>
+                    ) : null}
+                    {updateState.status === "error" && updateState.message ? (
+                      <div className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-5 text-muted">
+                        {updateState.message}
+                      </div>
+                    ) : null}
+                  </div>
+                  {availableUpdate ? (
+                    <div className="mt-4 rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+                      <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                        {text.releaseNotesLabel}
+                      </div>
+                      <div className="mt-2 max-h-44 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-6 text-foreground/88">
+                        {updateNotes ?? text.releaseNotesEmpty}
+                      </div>
+                    </div>
+                  ) : null}
+                  {availableUpdate ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        className="h-9 px-4"
+                        size="sm"
+                        disabled={updateState.status === "installing"}
+                        onClick={() => {
+                          void installAvailableUpdate();
+                        }}
+                      >
+                        {updateState.status === "installing"
+                          ? text.installingUpdateLabel
+                          : text.installUpdateLabel}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        </div>
+      ) : null}
+      {isUpdatePromptOpen && availableUpdate ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[radial-gradient(circle_at_top,rgb(var(--color-accent)/0.14),transparent_30%),rgb(var(--color-shadow-ambient)/0.56)] px-3 py-3 backdrop-blur-[12px] sm:items-center sm:px-4">
+          <button
+            aria-label={text.dismissUpdateLabel}
+            className="absolute inset-0"
+            disabled={updateState.status === "installing"}
+            type="button"
+            onClick={() => {
+              if (updateState.status !== "installing") {
+                void dismissAvailableUpdatePrompt();
+              }
+            }}
+          />
+          <Card className="relative z-10 w-full max-w-[32rem] overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.99),rgb(var(--color-surface-strong)/0.95))] p-0 shadow-[0_46px_104px_-44px_rgb(var(--color-shadow-ambient)/0.6),0_16px_32px_-20px_rgb(var(--color-shadow-warm)/0.18)] sm:rounded-[32px]">
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-accent-soft)/0.72),transparent_70%)] blur-2xl" />
+            <div className="relative border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] px-5 py-5">
+              <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-muted">
+                {text.updatePromptTitle}
+              </div>
+              <div className="mt-2 text-lg font-semibold text-foreground">
+                {availableUpdate.version}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-4 text-xs leading-5 text-muted">
+                <span>
+                  {text.currentVersionLabel}: {updateState.currentVersion || "..."}
+                </span>
+                {updateReleaseDate ? (
+                  <span>
+                    {text.releaseDateLabel}: {updateReleaseDate}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="space-y-4 px-5 py-5">
+              <div className="rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+                <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                  {text.releaseNotesLabel}
+                </div>
+                <div className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-foreground/88">
+                  {updateNotes ?? text.releaseNotesEmpty}
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  className="h-10 px-4"
+                  size="sm"
+                  variant="outline"
+                  disabled={updateState.status === "installing"}
+                  onClick={() => {
+                    void dismissAvailableUpdatePrompt();
+                  }}
+                >
+                  {text.dismissUpdateLabel}
+                </Button>
+                <Button
+                  className="h-10 px-4"
+                  size="sm"
+                  disabled={updateState.status === "installing"}
+                  onClick={() => {
+                    void installAvailableUpdate();
+                  }}
+                >
+                  {updateState.status === "installing"
+                    ? text.installingUpdateLabel
+                    : text.installUpdateLabel}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

@@ -1,5 +1,7 @@
 import type { PlatformBridge } from "../types";
 
+const UNSUPPORTED_VERSION = "unsupported";
+
 const ensureClipboard = () => {
   if (!globalThis.navigator?.clipboard) {
     throw new Error("当前环境不支持剪贴板访问。");
@@ -25,5 +27,18 @@ export const createWebPlatformBridge = (): PlatformBridge => ({
     anchor.click();
 
     URL.revokeObjectURL(url);
+  },
+  async getAppVersion() {
+    return UNSUPPORTED_VERSION;
+  },
+  async checkForAppUpdate() {
+    return {
+      status: "unsupported",
+      currentVersion: UNSUPPORTED_VERSION,
+      update: null,
+    };
+  },
+  async installAppUpdate() {
+    throw new Error("当前环境不支持应用更新。");
   }
 });

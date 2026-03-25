@@ -1,6 +1,7 @@
 import { ToolboxApp } from "@z-dev-toolbox/app-shell";
-import { createDesktopPlatformBridge } from "@z-dev-toolbox/platform";
 import { createDesktopStorageAdapter } from "@z-dev-toolbox/storage";
+
+import { createDesktopPlatformBridge } from "./platform-bridge";
 
 const bridge = createDesktopPlatformBridge();
 const storage = createDesktopStorageAdapter("z-dev-toolbox:desktop");

@@ -132,35 +132,88 @@ jobs:
       - name: Check synced versions
         run: pnpm check:versions
 
+      - name: Validate updater signing configuration
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${TAURI_SIGNING_PRIVATE_KEY}" ]]; then
+            echo "Missing secret: TAURI_SIGNING_PRIVATE_KEY" >&2
+            exit 1
+          fi
+
+          if [[ -z "${TAURI_UPDATER_PUBLIC_KEY}" ]]; then
+            echo "Missing secret: TAURI_UPDATER_PUBLIC_KEY" >&2
+            exit 1
+          fi
+
       - name: Build desktop bundle
         uses: tauri-apps/tauri-action@v0.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
         with:
           projectPath: apps/desktop/src-tauri
           tauriScript: pnpm --filter @z-dev-toolbox/desktop exec tauri
-          args: --bundles ${{ matrix.bundle }}
+          args: --bundles ${{ matrix.bundle }} --config tauri.release.conf.json
 
       - name: Prepare desktop artifact
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
         run: |
+          arch=$(node -p "process.arch")
+          case "$arch" in
+            x64)
+              target_arch="x86_64"
+              ;;
+            arm64)
+              target_arch="aarch64"
+              ;;
+            ia32)
+              target_arch="i686"
+              ;;
+            arm)
+              target_arch="armv7"
+              ;;
+            *)
+              target_arch="$arch"
+              ;;
+          esac
+
           case "${{ matrix.runner }}" in
             macos-latest)
               platform_key="macos"
               extension="dmg"
+              source_dir="apps/desktop/src-tauri/target/release/bundle/dmg"
               source_pattern="*.dmg"
+              updater_dir="apps/desktop/src-tauri/target/release/bundle/macos"
+              updater_pattern="*.app.tar.gz"
+              updater_sig_pattern="*.app.tar.gz.sig"
+              updater_extension=".app.tar.gz"
               ;;
             windows-latest)
               platform_key="windows"
               extension="exe"
+              source_dir="apps/desktop/src-tauri/target/release/bundle/nsis"
               source_pattern="*.exe"
+              updater_dir="$source_dir"
+              updater_pattern="*.exe"
+              updater_sig_pattern="*.exe.sig"
+              updater_extension=".exe"
               ;;
             ubuntu-22.04)
               platform_key="linux"
               extension="AppImage"
+              source_dir="apps/desktop/src-tauri/target/release/bundle/appimage"
               source_pattern="*.AppImage"
+              updater_dir="$source_dir"
+              updater_pattern="*.AppImage"
+              updater_sig_pattern="*.AppImage.sig"
+              updater_extension=".AppImage"
               ;;
             *)
               echo "Unsupported runner: ${{ matrix.runner }}" >&2
@@ -168,18 +221,32 @@ jobs:
               ;;
           esac
 
-          bundle_dir="apps/desktop/src-tauri/target/release/bundle/${{ matrix.bundle }}"
           mkdir -p "release-assets/desktop-${platform_key}"
-          source_file=$(find "$bundle_dir" -maxdepth 1 -type f -name "$source_pattern" | head -n 1)
+          source_file=$(find "$source_dir" -maxdepth 1 -type f -name "$source_pattern" | head -n 1)
+          updater_file=$(find "$updater_dir" -maxdepth 1 -type f -name "$updater_pattern" | head -n 1)
+          updater_sig=$(find "$updater_dir" -maxdepth 1 -type f -name "$updater_sig_pattern" | head -n 1)
 
           if [[ -z "$source_file" ]]; then
-            echo "Desktop bundle not found in $bundle_dir" >&2
+            echo "Desktop bundle not found in $source_dir" >&2
+            exit 1
+          fi
+
+          if [[ -z "$updater_file" || -z "$updater_sig" ]]; then
+            echo "Updater artifacts not found in $updater_dir" >&2
             exit 1
           fi
 
           cp \
             "$source_file" \
             "release-assets/desktop-${platform_key}/z-dev-toolbox-desktop-${platform_key}-v${RELEASE_VERSION}.${extension}"
+
+          cp \
+            "$updater_file" \
+            "release-assets/desktop-${platform_key}/z-dev-toolbox-updater-${platform_key}-${target_arch}-v${RELEASE_VERSION}${updater_extension}"
+
+          cp \
+            "$updater_sig" \
+            "release-assets/desktop-${platform_key}/z-dev-toolbox-updater-${platform_key}-${target_arch}-v${RELEASE_VERSION}${updater_extension}.sig"
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v6
@@ -229,6 +296,20 @@ jobs:
             --source-dir "release-assets/raw" \
             --output-dir "release-assets/final"
 
+      - name: Generate updater manifest
+        if: needs.prepare.outputs.publish_desktop == 'true'
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          node ./scripts/generate-updater-manifest.mjs \
+            --version "${RELEASE_VERSION}" \
+            --tag "${RELEASE_TAG}" \
+            --repo "${{ github.repository }}" \
+            --input-dir "release-assets/final" \
+            --output-file "release-assets/final/latest.json" \
+            --notes-file "release-notes/${RELEASE_TAG}.md"
+
       - name: Count release assets
         id: assets
         run: |
@@ -240,9 +321,15 @@ jobs:
         if: steps.assets.outputs.count != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_DESKTOP: ${{ needs.prepare.outputs.publish_desktop }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           notes_file="release-notes/${RELEASE_TAG}.md"
+          latest_args=()
+
+          if [[ "${PUBLISH_DESKTOP}" != "true" ]]; then
+            latest_args+=(--latest=false)
+          fi
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release edit "${RELEASE_TAG}" --notes-file "${notes_file}"
@@ -253,15 +340,22 @@ jobs:
           gh release create "${RELEASE_TAG}" \
             release-assets/final/* \
             --notes-file "${notes_file}" \
+            "${latest_args[@]}" \
             --verify-tag
 
       - name: Publish GitHub release notes
         if: steps.assets.outputs.count == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_DESKTOP: ${{ needs.prepare.outputs.publish_desktop }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           notes_file="release-notes/${RELEASE_TAG}.md"
+          latest_args=()
+
+          if [[ "${PUBLISH_DESKTOP}" != "true" ]]; then
+            latest_args+=(--latest=false)
+          fi
 
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release edit "${RELEASE_TAG}" --notes-file "${notes_file}"
@@ -270,4 +364,20 @@ jobs:
 
           gh release create "${RELEASE_TAG}" \
             --notes-file "${notes_file}" \
+            "${latest_args[@]}" \
             --verify-tag
+
+      - name: Keep non-desktop release out of latest
+        if: needs.prepare.outputs.publish_desktop != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          release_id=$(gh api "repos/${REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')
+
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${REPOSITORY}/releases/${release_id}" \
+            -f make_latest=false
