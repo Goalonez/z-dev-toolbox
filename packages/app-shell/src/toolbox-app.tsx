@@ -30,6 +30,7 @@ import { Button, Card, Input, cn } from "@z-dev-toolbox/ui";
 const PREFERENCES_KEY = "shell:preferences";
 const UPDATE_DISMISSED_VERSION_KEY = "shell:update-dismissed-version";
 const UPDATE_CHECK_TIMEOUT_MS = 8000;
+const TOAST_DURATION_MS = 900;
 const REPOSITORY_URL = "https://github.com/Goalonez/z-dev-toolbox";
 
 interface ToolboxAppProps {
@@ -536,7 +537,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
     toastTimeoutRef.current = window.setTimeout(() => {
       setToast((current) => (current?.id === nextToast.id ? null : current));
       toastTimeoutRef.current = null;
-    }, 2200);
+    }, TOAST_DURATION_MS);
   }, []);
 
   const dismissAvailableUpdatePrompt = useCallback(async () => {
@@ -1082,12 +1083,12 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         <div className="pointer-events-none fixed inset-x-3 top-3 z-50 md:left-auto md:right-4 md:top-4">
           <div
             className={cn(
-              "relative flex max-w-none items-start gap-3 overflow-hidden rounded-[22px] border px-4 py-3.5 text-sm text-foreground shadow-[0_30px_64px_-34px_rgb(var(--color-shadow-ambient)/0.62),0_10px_24px_-20px_rgb(var(--color-shadow-warm)/0.16)] backdrop-blur-[20px] md:max-w-[360px]",
+              "relative flex max-w-none items-start gap-3 overflow-hidden rounded-[20px] border px-4 py-3 text-sm text-foreground shadow-[0_8px_18px_-16px_rgb(var(--color-shadow-ambient)/0.1)] backdrop-blur-[6px] md:max-w-[340px]",
               toast.tone === "error"
-                ? "border-danger/22 bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgba(198,100,78,0.14))]"
+                ? "border-danger/12 bg-[rgb(var(--color-surface)/0.24)]"
                 : toast.tone === "success"
-                  ? "border-accent/22 bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-accent-soft)/0.78))]"
-                  : "border-[rgb(var(--color-border)/0.54)] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-surface-strong)/0.94))]",
+                  ? "border-accent/12 bg-[rgb(var(--color-surface)/0.24)]"
+                  : "border-[rgb(var(--color-border)/0.14)] bg-[rgb(var(--color-surface)/0.24)]",
             )}
           >
             <span
@@ -1102,12 +1103,12 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
             />
             <span
               className={cn(
-                "mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border",
+                "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border",
                 toast.tone === "error"
-                  ? "border-danger/24 bg-danger/12 text-danger"
+                  ? "border-danger/12 bg-danger/5 text-danger"
                   : toast.tone === "success"
-                    ? "border-accent/22 bg-accentSoft/62 text-accent"
-                    : "border-[rgb(var(--color-border)/0.58)] bg-[rgb(var(--color-surface-muted)/0.22)] text-accent",
+                    ? "border-accent/12 bg-accentSoft/18 text-accent"
+                    : "border-[rgb(var(--color-border)/0.2)] bg-[rgb(var(--color-surface-muted)/0.06)] text-accent",
               )}
             >
               <ToastIcon tone={toast.tone} />

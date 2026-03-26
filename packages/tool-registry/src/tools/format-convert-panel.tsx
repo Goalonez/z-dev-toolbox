@@ -162,10 +162,7 @@ export const FormatConvertPanel = ({
     }
 
     setResult(nextResult.data);
-    reportSuccess(
-      `${text.successMessage}: ${formatLabels[nextResult.data.sourceFormat][locale]} -> ${formatLabels[nextResult.data.targetFormat][locale]}`,
-      nextResult.data.result,
-    );
+    reportSuccess(text.successMessage, nextResult.data.result);
   };
 
   return (

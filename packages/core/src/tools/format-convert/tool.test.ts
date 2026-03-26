@@ -86,6 +86,79 @@ describe("convertDataFormat", () => {
     }
   });
 
+  it("wraps xml output with root when the object has multiple top-level keys", () => {
+    const result = convertDataFormat({
+      source:
+        "{\"code\":500,\"message\":\"没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）\",\"param\":null,\"type\":\"invalid_request_error\"}",
+      sourceFormat: "auto",
+      targetFormat: "xml",
+      indent: 2
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.sourceFormat).toBe("json");
+      expect(result.data.result).toContain("<root>");
+      expect(result.data.result).toContain("<code>500</code>");
+      expect(result.data.result).toContain("<param />");
+    }
+  });
+
+  it("converts a json object into a single-row csv table", () => {
+    const result = convertDataFormat({
+      source:
+        "{\"code\":500,\"message\":\"没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）\",\"param\":null,\"type\":\"invalid_request_error\"}",
+      sourceFormat: "auto",
+      targetFormat: "csv",
+      indent: 2
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.result).toBe(
+        "code,message,param,type\n500,没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）,,invalid_request_error",
+      );
+    }
+  });
+
+  it("converts a json object into an html table", () => {
+    const result = convertDataFormat({
+      source:
+        "{\"code\":500,\"message\":\"没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）\",\"param\":null,\"type\":\"invalid_request_error\"}",
+      sourceFormat: "auto",
+      targetFormat: "html",
+      indent: 2
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.result).toBe(
+        "<table><thead><tr><th>code</th><th>message</th><th>param</th><th>type</th></tr></thead><tbody><tr><td>500</td><td>没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）</td><td>null</td><td>invalid_request_error</td></tr></tbody></table>",
+      );
+    }
+  });
+
+  it("converts a json object into http query parameters", () => {
+    const result = convertDataFormat({
+      source:
+        "{\"code\":500,\"message\":\"没有可用token（traceid: f335e34bce529918f08bcb1bbe2c7ffc）\",\"param\":null,\"type\":\"invalid_request_error\"}",
+      sourceFormat: "auto",
+      targetFormat: "http",
+      indent: 2
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.result).toBe(
+        "code=500&message=%E6%B2%A1%E6%9C%89%E5%8F%AF%E7%94%A8token%EF%BC%88traceid%3A%20f335e34bce529918f08bcb1bbe2c7ffc%EF%BC%89&param=&type=invalid_request_error",
+      );
+    }
+  });
+
   it("parses raw http into json", () => {
     const result = convertDataFormat({
       source: "POST /tools HTTP/1.1\nHost: example.com\nContent-Type: application/json\n\n{\"name\":\"toolbox\"}",

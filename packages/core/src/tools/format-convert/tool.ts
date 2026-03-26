@@ -50,6 +50,11 @@ interface MarkupNode {
   children: MarkupChild[];
 }
 
+interface TableShape {
+  headers: string[];
+  rows: Array<Array<JsonValue | undefined>>;
+}
+
 const htmlVoidTags = new Set([
   "area",
   "base",
@@ -619,9 +624,36 @@ const stringifyCsvCell = (value: JsonValue) => {
   return text;
 };
 
+const normalizeCsvCellValue = (value: JsonValue | undefined): JsonValue => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  if (Array.isArray(value) || isJsonObject(value)) {
+    return JSON.stringify(value);
+  }
+
+  return value;
+};
+
 const stringifyCsv = (value: JsonValue) => {
+  if (isJsonObject(value)) {
+    const headers = Object.keys(value);
+
+    if (headers.length === 0) {
+      return "";
+    }
+
+    return [
+      headers.map((item) => stringifyCsvCell(item)).join(","),
+      headers
+        .map((header) => stringifyCsvCell(normalizeCsvCellValue(value[header])))
+        .join(",")
+    ].join("\n");
+  }
+
   if (!Array.isArray(value)) {
-    throw new Error("只有数组结构可以转换为 CSV。");
+    return stringifyCsvCell(normalizeCsvCellValue(value));
   }
 
   if (value.length === 0) {
@@ -646,14 +678,18 @@ const stringifyCsv = (value: JsonValue) => {
 
     const body = value.map((item) =>
       headers
-        .map((header) => stringifyCsvCell((item as JsonObject)[header] ?? ""))
+        .map((header) =>
+          stringifyCsvCell(normalizeCsvCellValue((item as JsonObject)[header])),
+        )
         .join(","),
     );
 
     return [headers.map((item) => stringifyCsvCell(item)).join(","), ...body].join("\n");
   }
 
-  return value.map((item) => stringifyCsvCell(item)).join("\n");
+  return value
+    .map((item) => stringifyCsvCell(normalizeCsvCellValue(item)))
+    .join("\n");
 };
 
 const appendMarkupText = (target: MarkupNode, value: string) => {
@@ -939,6 +975,110 @@ const escapeMarkupText = (value: string) =>
 const escapeMarkupAttribute = (value: string) =>
   escapeMarkupText(value).replace(/"/g, "&quot;");
 
+const stringifyHtmlTableCell = (value: JsonValue | undefined) => {
+  if (value === undefined) {
+    return "";
+  }
+
+  if (value === null) {
+    return "null";
+  }
+
+  if (Array.isArray(value) || isJsonObject(value)) {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+};
+
+const buildTableShape = (value: JsonValue): TableShape => {
+  if (isJsonObject(value)) {
+    const headers = Object.keys(value);
+
+    return {
+      headers,
+      rows: [headers.map((header) => value[header])]
+    };
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return {
+        headers: [] as string[],
+        rows: [] as Array<Array<JsonValue | undefined>>
+      };
+    }
+
+    if (value.every((item) => isJsonObject(item))) {
+      const headers = Array.from(
+        value.reduce((result, item) => {
+          Object.keys(item as JsonObject).forEach((key) => result.add(key));
+          return result;
+        }, new Set<string>()),
+      );
+
+      return {
+        headers,
+        rows: value.map((item) =>
+          headers.map((header) => (item as JsonObject)[header]),
+        )
+      };
+    }
+
+    if (value.every((item) => Array.isArray(item))) {
+      const arrayRows = value as JsonValue[][];
+      const columnCount = arrayRows.reduce(
+        (current, item) => Math.max(current, item.length),
+        0,
+      );
+      const headers = Array.from(
+        { length: columnCount },
+        (_, index) => `column${index + 1}`,
+      );
+
+      return {
+        headers,
+        rows: arrayRows.map((item) =>
+          headers.map((_, index) => item[index]),
+        )
+      };
+    }
+
+    return {
+      headers: ["value"],
+      rows: value.map((item) => [item])
+    };
+  }
+
+  return {
+    headers: ["value"],
+    rows: [[value]]
+  };
+};
+
+const stringifyHtmlTable = (value: JsonValue) => {
+  const { headers, rows } = buildTableShape(value);
+  const thead =
+    headers.length === 0
+      ? "<thead></thead>"
+      : `<thead><tr>${headers
+          .map((header) => `<th>${escapeMarkupText(header)}</th>`)
+          .join("")}</tr></thead>`;
+  const tbody = `<tbody>${rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map(
+            (cell) =>
+              `<td>${escapeMarkupText(stringifyHtmlTableCell(cell))}</td>`,
+          )
+          .join("")}</tr>`,
+    )
+    .join("")}</tbody>`;
+
+  return `<table>${thead}${tbody}</table>`;
+};
+
 const renderMarkupNode = ({
   tagName,
   value,
@@ -969,6 +1109,10 @@ const renderMarkupNode = ({
   }
 
   if (!isJsonObject(value)) {
+    if (value === null) {
+      return `${pad}<${tagName} />`;
+    }
+
     return `${pad}<${tagName}>${escapeMarkupText(String(value ?? ""))}</${tagName}>`;
   }
 
@@ -1025,6 +1169,40 @@ const stringifyMarkup = (
   mode: "xml" | "html",
   indent: number,
 ) => {
+  if (mode === "xml") {
+    if (isJsonObject(value)) {
+      const entries = Object.entries(value);
+
+      if (entries.length === 1 && !Array.isArray(entries[0]?.[1])) {
+        const [tagName, rootValue] = entries[0]!;
+
+        return renderMarkupNode({
+          tagName,
+          value: rootValue,
+          depth: 0,
+          indent,
+          mode
+        });
+      }
+
+      return renderMarkupNode({
+        tagName: "root",
+        value,
+        depth: 0,
+        indent,
+        mode
+      });
+    }
+
+    return renderMarkupNode({
+      tagName: "root",
+      value: Array.isArray(value) ? { item: value } : value,
+      depth: 0,
+      indent,
+      mode
+    });
+  }
+
   if (!isJsonObject(value)) {
     throw new Error("只有对象结构可以转换为标记格式。");
   }
@@ -1047,6 +1225,57 @@ const stringifyMarkup = (
 };
 
 const parseHttp = (source: string): JsonValue => {
+  const trimmed = source.trim();
+
+  if (!trimmed) {
+    throw new Error("HTTP 内容为空。");
+  }
+
+  const querySource = (() => {
+    if (/^[a-z][a-z0-9+.-]*:\/\/\S+\?\S+/i.test(trimmed)) {
+      const questionIndex = trimmed.indexOf("?");
+      return questionIndex >= 0 ? trimmed.slice(questionIndex + 1) : trimmed;
+    }
+
+    if (trimmed.startsWith("?")) {
+      return trimmed.slice(1);
+    }
+
+    return trimmed;
+  })();
+
+  if (!/\r?\n/.test(querySource) && querySource.includes("=")) {
+    const query = querySource.replace(/#.*/, "");
+    const result: JsonObject = {};
+
+    query.split("&").forEach((segment) => {
+      if (!segment) {
+        return;
+      }
+
+      const equalIndex = segment.indexOf("=");
+      const rawKey = equalIndex >= 0 ? segment.slice(0, equalIndex) : segment;
+      const rawValue = equalIndex >= 0 ? segment.slice(equalIndex + 1) : "";
+      const key = decodeURIComponent(rawKey.replace(/\+/g, " "));
+      const value = decodeURIComponent(rawValue.replace(/\+/g, " "));
+      const current = result[key];
+
+      if (current === undefined) {
+        result[key] = value;
+        return;
+      }
+
+      if (Array.isArray(current)) {
+        current.push(value);
+        return;
+      }
+
+      result[key] = [current, value];
+    });
+
+    return result;
+  }
+
   const lines = source.split(/\r?\n/);
   const firstLine = lines[0]?.trim();
 
@@ -1120,6 +1349,18 @@ const parseHttp = (source: string): JsonValue => {
   throw new Error("无法识别 HTTP 起始行。");
 };
 
+const stringifyQueryParameterValue = (value: JsonValue | undefined) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  if (Array.isArray(value) || isJsonObject(value)) {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+};
+
 const stringifyHttp = (value: JsonValue, indent: number) => {
   if (!isJsonObject(value)) {
     throw new Error("只有对象结构可以转换为 HTTP。");
@@ -1135,37 +1376,50 @@ const stringifyHttp = (value: JsonValue, indent: number) => {
     (typeof value.version === "string" &&
       typeof value.statusCode === "number");
 
-  if (!isRequest && !isResponse) {
-    throw new Error("当前对象不符合 HTTP 请求或响应结构。");
-  }
+  if (isRequest || isResponse) {
+    const headers = isJsonObject(value.headers) ? { ...value.headers } : {};
+    const body = value.body;
+    let bodyText = "";
 
-  const headers = isJsonObject(value.headers) ? { ...value.headers } : {};
-  const body = value.body;
-  let bodyText = "";
+    if (body !== undefined && body !== "") {
+      if (typeof body === "string") {
+        bodyText = body;
+      } else {
+        bodyText = JSON.stringify(body, null, indent);
 
-  if (body !== undefined && body !== "") {
-    if (typeof body === "string") {
-      bodyText = body;
-    } else {
-      bodyText = JSON.stringify(body, null, indent);
-
-      if (!headers["Content-Type"] && !headers["content-type"]) {
-        headers["Content-Type"] = "application/json";
+        if (!headers["Content-Type"] && !headers["content-type"]) {
+          headers["Content-Type"] = "application/json";
+        }
       }
     }
+
+    const startLine = isRequest
+      ? `${value.method} ${value.target} ${value.version}`
+      : `${value.version} ${value.statusCode}${value.statusText ? ` ${value.statusText}` : ""}`;
+    const headerText = Object.entries(headers)
+      .map(([key, item]) => `${key}: ${String(item)}`)
+      .join("\n");
+
+    return [startLine, headerText, bodyText ? "" : null, bodyText]
+      .filter((item) => item !== null)
+      .join("\n")
+      .trimEnd();
   }
 
-  const startLine = isRequest
-    ? `${value.method} ${value.target} ${value.version}`
-    : `${value.version} ${value.statusCode}${value.statusText ? ` ${value.statusText}` : ""}`;
-  const headerText = Object.entries(headers)
-    .map(([key, item]) => `${key}: ${String(item)}`)
-    .join("\n");
+  return Object.entries(value)
+    .flatMap(([key, item]) => {
+      if (Array.isArray(item)) {
+        return item.map(
+          (child) =>
+            `${encodeURIComponent(key)}=${encodeURIComponent(stringifyQueryParameterValue(child))}`,
+        );
+      }
 
-  return [startLine, headerText, bodyText ? "" : null, bodyText]
-    .filter((item) => item !== null)
-    .join("\n")
-    .trimEnd();
+      return `${encodeURIComponent(key)}=${encodeURIComponent(
+        stringifyQueryParameterValue(item),
+      )}`;
+    })
+    .join("&");
 };
 
 const detectFormat = (source: string): DataFormat | null => {
@@ -1178,6 +1432,14 @@ const detectFormat = (source: string): DataFormat | null => {
   if (
     /^([A-Z]+)\s+\S+\s+HTTP\/\d(?:\.\d)?$/m.test(trimmed.split(/\r?\n/, 1)[0] ?? "") ||
     /^HTTP\/\d(?:\.\d)?\s+\d{3}/m.test(trimmed.split(/\r?\n/, 1)[0] ?? "")
+  ) {
+    return "http";
+  }
+
+  if (
+    /^[^=\s&?#]+=[^&]*(?:&[^=\s&?#]+=[^&]*)+$/.test(trimmed) ||
+    /^\?[^=\s&?#]+=[^&]*(?:&[^=\s&?#]+=[^&]*)*$/.test(trimmed) ||
+    /^[a-z][a-z0-9+.-]*:\/\/\S+\?\S+=/i.test(trimmed)
   ) {
     return "http";
   }
@@ -1278,7 +1540,7 @@ const stringifyByFormat = (
     case "properties":
       return stringifyProperties(value);
     case "html":
-      return stringifyMarkup(value, "html", indent);
+      return stringifyHtmlTable(value);
     case "http":
       return stringifyHttp(value, indent);
   }
