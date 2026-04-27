@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   generateSnowflakeIds,
@@ -21,8 +21,9 @@ import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:snowflake.generate:draft:v3";
 
-interface SnowflakeDraft {
-  timestamp: string;
+type TimestampMode = "auto" | "manual";
+
+interface PersistedSnowflakeDraft {
   datacenterId: string;
   workerId: string;
   sequenceStart: string;
@@ -30,14 +31,44 @@ interface SnowflakeDraft {
   count: string;
 }
 
-const createDefaultDraft = (): SnowflakeDraft => ({
-  timestamp: String(Date.now()),
+const defaultPersistedDraft: PersistedSnowflakeDraft = {
   datacenterId: "1",
   workerId: "1",
   sequenceStart: "0",
   epoch: "1288834974657",
   count: "10",
+};
+
+const createCurrentTimestamp = () => String(Date.now());
+
+const normalizePersistedDraft = (
+  value: Partial<PersistedSnowflakeDraft> | null | undefined,
+): PersistedSnowflakeDraft => ({
+  datacenterId:
+    typeof value?.datacenterId === "string"
+      ? value.datacenterId
+      : defaultPersistedDraft.datacenterId,
+  workerId:
+    typeof value?.workerId === "string"
+      ? value.workerId
+      : defaultPersistedDraft.workerId,
+  sequenceStart:
+    typeof value?.sequenceStart === "string"
+      ? value.sequenceStart
+      : defaultPersistedDraft.sequenceStart,
+  epoch:
+    typeof value?.epoch === "string"
+      ? value.epoch
+      : defaultPersistedDraft.epoch,
+  count:
+    typeof value?.count === "string"
+      ? value.count
+      : defaultPersistedDraft.count,
 });
+
+interface SnowflakeDraft extends PersistedSnowflakeDraft {
+  timestamp: string;
+}
 
 const snowflakeFieldOrder: Array<keyof SnowflakeDraft> = [
   "timestamp",
@@ -125,11 +156,17 @@ export const SnowflakePanel = ({
 }: ToolPanelProps) => {
   const text = panelCopy[locale];
   const common = commonPanelCopy[locale];
-  const [draft, setDraft] = useToolDraftState<SnowflakeDraft>(
+  const [rawPersistedDraft, setPersistedDraft] = useToolDraftState<PersistedSnowflakeDraft>(
     storage,
     TOOL_DRAFT_KEY,
-    createDefaultDraft(),
+    defaultPersistedDraft,
   );
+  const persistedDraft = useMemo(
+    () => normalizePersistedDraft(rawPersistedDraft),
+    [rawPersistedDraft],
+  );
+  const [timestamp, setTimestamp] = useState(createCurrentTimestamp);
+  const [timestampMode, setTimestampMode] = useState<TimestampMode>("auto");
   const [result, setResult] = useState<SnowflakeOutput | null>(null);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
@@ -139,19 +176,40 @@ export const SnowflakePanel = ({
     notify,
   });
 
-  const updateDraft = (value: Partial<SnowflakeDraft>) => {
-    setDraft((current) => ({ ...current, ...value }));
+  const draft: SnowflakeDraft = {
+    ...persistedDraft,
+    timestamp,
+  };
+
+  const resetState = () => {
     setResult(null);
     setFeedback(null);
   };
 
+  const updatePersistedDraft = (value: Partial<PersistedSnowflakeDraft>) => {
+    setPersistedDraft((current) =>
+      normalizePersistedDraft({
+        ...normalizePersistedDraft(current),
+        ...value,
+      }),
+    );
+    resetState();
+  };
+
   const runGenerate = () => {
+    const currentTimestamp =
+      timestampMode === "auto" ? createCurrentTimestamp() : draft.timestamp;
+
+    if (timestampMode === "auto") {
+      setTimestamp(currentTimestamp);
+    }
+
     const nextResult = generateSnowflakeIds({
       workerId: parseNumberField(draft.workerId),
       datacenterId: parseNumberField(draft.datacenterId),
       count: parseNumberField(draft.count),
       sequenceStart: parseNumberField(draft.sequenceStart),
-      timestamp: parseNumberField(draft.timestamp),
+      timestamp: parseNumberField(currentTimestamp),
       epoch: parseNumberField(draft.epoch),
     });
 
@@ -185,7 +243,16 @@ export const SnowflakePanel = ({
                 spellCheck={false}
                 value={draft[field]}
                 onChange={(event) => {
-                  updateDraft({ [field]: event.currentTarget.value });
+                  if (field === "timestamp") {
+                    setTimestamp(event.currentTarget.value);
+                    setTimestampMode("manual");
+                    resetState();
+                    return;
+                  }
+
+                  updatePersistedDraft({
+                    [field]: event.currentTarget.value,
+                  } as Partial<PersistedSnowflakeDraft>);
                 }}
               />
             </div>
@@ -215,9 +282,10 @@ export const SnowflakePanel = ({
               size="sm"
               variant="ghost"
               onClick={() => {
-                setDraft(createDefaultDraft());
-                setResult(null);
-                setFeedback(null);
+                setPersistedDraft(defaultPersistedDraft);
+                setTimestamp(createCurrentTimestamp());
+                setTimestampMode("auto");
+                resetState();
               }}
             >
               {common.clear}

@@ -1,4 +1,5 @@
 export * from "./tools/json-format/tool";
+export * from "./tools/xml-format/tool";
 export * from "./tools/format-convert/tool";
 export * from "./tools/base64/tool";
 export * from "./tools/url-encode/tool";

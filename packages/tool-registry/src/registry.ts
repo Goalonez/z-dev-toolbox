@@ -4,6 +4,7 @@ import { CrontabPanel } from "./tools/crontab-panel";
 import { FormatConvertPanel } from "./tools/format-convert-panel";
 import { HashPanel } from "./tools/hash-panel";
 import { JsonFormatPanel } from "./tools/json-format-panel";
+import { XmlFormatPanel } from "./tools/xml-format-panel";
 import { QrCodePanel } from "./tools/qr-code-panel";
 import { RegexPanel } from "./tools/regex-panel";
 import { SnowflakePanel } from "./tools/snowflake-panel";
@@ -35,6 +36,29 @@ export const toolRegistry: ToolRegistryEntry[] = [
       }
     },
     Panel: JsonFormatPanel
+  },
+  {
+    manifest: {
+      id: "xml.format",
+      name: "XML 格式化",
+      summary: "格式化、压缩并校验 XML 文本。",
+      category: "data",
+      keywords: ["xml", "format", "formatter", "minify", "validate"],
+      platforms: ["web", "extension", "desktop"],
+      localizations: {
+        "en-US": {
+          name: "XML Formatter",
+          summary: "Format, minify, and validate XML text.",
+          category: "Data",
+          keywords: ["xml", "format", "formatter", "minify", "validate"]
+        },
+        "zh-CN": {
+          category: "数据",
+          keywords: ["xml", "格式化", "压缩", "校验"]
+        }
+      }
+    },
+    Panel: XmlFormatPanel
   },
   {
     manifest: {

@@ -9,6 +9,7 @@ import { evaluateRegex } from "./regex/tool";
 import { generateSnowflakeIds } from "./snowflake/tool";
 import { convertTimestamp } from "./timestamp/tool";
 import { transformUrlEncoding } from "./url-encode/tool";
+import { formatXml } from "./xml-format/tool";
 
 describe("tool suite", () => {
   it("handles unicode base64 roundtrip", () => {
@@ -163,6 +164,21 @@ describe("tool suite", () => {
       expect(BigInt(result.data.items[1]?.id ?? "0")).toBeGreaterThan(
         BigInt(result.data.items[0]?.id ?? "0"),
       );
+    }
+  });
+
+  it("formats xml content", () => {
+    const result = formatXml({
+      source: "<root><item>ok</item></root>",
+      indent: 2,
+      mode: "pretty"
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.formatted).toContain("<item>");
+      expect(result.data.lineCount).toBeGreaterThan(1);
     }
   });
 
