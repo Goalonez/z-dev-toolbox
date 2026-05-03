@@ -10,4 +10,5 @@ export * from "./tools/text-diff/tool";
 export * from "./tools/hash/tool";
 export * from "./tools/regex/tool";
 export * from "./tools/color/tool";
+export * from "./tools/sql-format/tool";
 export * from "./tools/snowflake/tool";

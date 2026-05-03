@@ -6,6 +6,7 @@ import { analyzeCrontab } from "./crontab/tool";
 import { diffText } from "./text-diff/tool";
 import { hashText } from "./hash/tool";
 import { evaluateRegex } from "./regex/tool";
+import { formatSql } from "./sql-format/tool";
 import { generateSnowflakeIds } from "./snowflake/tool";
 import { convertTimestamp } from "./timestamp/tool";
 import { transformUrlEncoding } from "./url-encode/tool";
@@ -179,6 +180,44 @@ describe("tool suite", () => {
     if (result.ok) {
       expect(result.data.formatted).toContain("<item>");
       expect(result.data.lineCount).toBeGreaterThan(1);
+    }
+  });
+
+  it("formats sql with dialect and casing options", () => {
+    const result = formatSql({
+      source: "select user_id, created_at from users where status = 'active' order by created_at desc;",
+      mode: "pretty",
+      dialect: "postgresql",
+      tabWidth: 4,
+      keywordCase: "upper",
+      identifierCase: "lower"
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.formatted).toContain("SELECT");
+      expect(result.data.formatted).toContain("FROM\n    users");
+      expect(result.data.lineCount).toBeGreaterThan(1);
+      expect(result.data.dialect).toBe("postgresql");
+    }
+  });
+
+  it("minifies sql into a single line", () => {
+    const result = formatSql({
+      source: "SELECT\n  id,\n  name\nFROM users\nWHERE active = 1;",
+      mode: "compact",
+      dialect: "sql",
+      tabWidth: 2,
+      keywordCase: "preserve",
+      identifierCase: "preserve"
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (result.ok) {
+      expect(result.data.formatted).toBe("SELECT id, name FROM users WHERE active = 1;");
+      expect(result.data.lineCount).toBe(1);
     }
   });
 

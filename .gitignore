@@ -23,3 +23,6 @@ apps/desktop/dist/
 apps/desktop/src-tauri/target/
 AGENTS.md
 CLAUDE.md
+.claude/
+.trellis/
+.history/

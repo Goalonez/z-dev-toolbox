@@ -1,7 +1,7 @@
 {
   "name": "@z-dev-toolbox/core",
   "private": true,
-  "version": "1.0.14",
+  "version": "1.0.15",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@z-dev-toolbox/shared": "workspace:*",
     "qrcode": "^1.5.4",
+    "sql-formatter": "^15.7.3",
     "yaml": "^2.8.2",
     "zod": "^3.24.1"
   }

@@ -4,6 +4,7 @@ import { CrontabPanel } from "./tools/crontab-panel";
 import { FormatConvertPanel } from "./tools/format-convert-panel";
 import { HashPanel } from "./tools/hash-panel";
 import { JsonFormatPanel } from "./tools/json-format-panel";
+import { SqlFormatPanel } from "./tools/sql-format-panel";
 import { XmlFormatPanel } from "./tools/xml-format-panel";
 import { QrCodePanel } from "./tools/qr-code-panel";
 import { RegexPanel } from "./tools/regex-panel";
@@ -321,6 +322,29 @@ export const toolRegistry: ToolRegistryEntry[] = [
       }
     },
     Panel: CrontabPanel
+  },
+  {
+    manifest: {
+      id: "sql.format",
+      name: "SQL 格式化",
+      summary: "格式化、压缩 SQL，并支持切换方言与大小写规则。",
+      category: "data",
+      keywords: ["sql", "format", "formatter", "dialect", "query"],
+      platforms: ["web", "extension", "desktop"],
+      localizations: {
+        "en-US": {
+          name: "SQL Formatter",
+          summary: "Format and minify SQL with dialect and casing controls.",
+          category: "Data",
+          keywords: ["sql", "format", "formatter", "dialect", "query"]
+        },
+        "zh-CN": {
+          category: "数据",
+          keywords: ["sql", "格式化", "压缩", "方言", "查询"]
+        }
+      }
+    },
+    Panel: SqlFormatPanel
   },
   {
     manifest: {
