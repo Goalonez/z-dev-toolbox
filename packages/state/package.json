@@ -1,7 +1,7 @@
 {
   "name": "@z-dev-toolbox/state",
   "private": true,
-  "version": "1.0.15",
+  "version": "1.0.16",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

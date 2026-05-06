@@ -24,11 +24,11 @@ export const toolInsetBorderClassName =
   "border-[rgb(var(--color-border)/var(--panel-inner-border-alpha))]";
 
 export const toolInsetPanelClassName =
-  "border-[rgb(var(--color-border)/var(--panel-inner-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/var(--panel-inner-surface-top-alpha)),rgb(var(--color-surface-strong)/var(--panel-inner-surface-bottom-alpha)))] shadow-[0_18px_30px_-28px_rgb(var(--color-shadow-ambient)/0.34)]";
+  "border-[rgb(var(--color-border)/var(--panel-inner-border-alpha))] bg-[rgb(var(--color-surface)/0.78)] shadow-[0_16px_34px_-30px_rgb(var(--color-shadow-ambient)/0.32)] backdrop-blur-[14px]";
 
 const paneHeaderControlClassName =
   "[&_button]:min-h-0 [&_button]:text-xs [&_[data-tool-select-trigger='true']]:text-xs " +
-  "[&_[data-tool-segmented='true']]:p-[3px] [&_[data-tool-segmented='true']_button]:h-7 [&_[data-tool-segmented='true']_button]:rounded-full [&_[data-tool-segmented='true']_button]:px-3 [&_[data-tool-segmented='true']_button]:text-[11px]";
+  "[&_[data-tool-segmented='true']]:p-[3px] [&_[data-tool-segmented='true']_button]:h-7 [&_[data-tool-segmented='true']_button]:rounded-[14px] [&_[data-tool-segmented='true']_button]:px-3 [&_[data-tool-segmented='true']_button]:text-[11px]";
 
 export interface ToolFeedback {
   tone: "success" | "error" | "muted";
@@ -75,14 +75,19 @@ export const ToolPane = ({
   const shouldRenderHeader = !hideHeader && (title || headerCenter || toolbar);
 
   return (
-    <Card className={cn("flex min-h-0 flex-col overflow-hidden", className)}>
+    <Card
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden bg-[rgb(var(--color-surface)/0.9)]",
+        className,
+      )}
+    >
       {shouldRenderHeader ? (
-        <CardHeader className="border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] px-3 py-2.5 sm:px-4">
+        <CardHeader className="border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] bg-[rgb(var(--color-surface)/0.72)] px-3 py-3 sm:px-4">
           <div className="flex flex-col gap-2 sm:hidden">
             {title || toolbar ? (
               <div className="flex min-w-0 items-center gap-2">
                 {title ? (
-                  <CardTitle className="min-w-0 flex-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted">
+                  <CardTitle className="min-w-0 flex-1 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted/84">
                     {title}
                   </CardTitle>
                 ) : (
@@ -118,7 +123,7 @@ export const ToolPane = ({
             )}
           >
             {title ? (
-              <CardTitle className="min-w-0 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-muted">
+              <CardTitle className="min-w-0 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-muted/84">
                 {title}
               </CardTitle>
             ) : (
@@ -146,7 +151,7 @@ export const ToolPane = ({
           </div>
         </CardHeader>
       ) : null}
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3.5 px-3.5 pb-3.5 pt-3.5 sm:px-4 sm:pb-4 sm:pt-4">
         {children}
         {footer}
       </CardContent>
@@ -163,7 +168,7 @@ export const ToolFieldLabel = ({
 }) => (
   <div
     className={cn(
-      "text-[0.7rem] font-medium uppercase tracking-[0.16em] text-muted",
+      "text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted/84",
       className,
     )}
   >
@@ -182,7 +187,7 @@ export const ToolControlField = ({
 }) => (
   <label
     className={cn(
-      "inline-flex h-8 min-w-0 max-w-full items-center gap-2 rounded-[1rem] border px-3 text-xs text-muted [&_[data-tool-select-trigger='true']]:min-w-0 [&_[data-tool-select-trigger='true']]:max-w-full [&_[data-tool-select-trigger='true']]:flex-1",
+      "inline-flex h-8 min-w-0 max-w-full items-center gap-2 rounded-[12px] border px-3 text-xs text-muted [&_[data-tool-select-trigger='true']]:min-w-0 [&_[data-tool-select-trigger='true']]:max-w-full [&_[data-tool-select-trigger='true']]:flex-1",
       toolInsetPanelClassName,
       className,
     )}
@@ -201,7 +206,7 @@ export const ToolHint = ({
 }) => (
   <div
     className={cn(
-      "rounded-[20px] border border-[rgb(var(--color-border)/calc(var(--divider-border-alpha)+0.06))] bg-[rgb(var(--color-surface-muted)/0.14)] px-3.5 py-2.5 text-[0.82rem] leading-5 text-muted",
+      "rounded-[14px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-surface-muted)/0.68)] px-3.5 py-2.5 text-[0.82rem] leading-5 text-muted",
       className,
     )}
   >
@@ -221,7 +226,7 @@ export const ToolActionBar = ({
   const { actionsRef, density } = useToolActionDensity();
 
   return (
-    <div className="border-t border-[rgb(var(--color-border)/var(--divider-border-alpha))] pt-3">
+    <div className="border-t border-[rgb(var(--color-border)/var(--divider-border-alpha))] pt-3.5">
       <div
         ref={actionsRef}
         className={cn(
@@ -268,7 +273,7 @@ export const ToolActionDock = ({
   return (
     <Card
       className={cn(
-        "xl:col-span-2 flex min-h-0 flex-col gap-3 overflow-hidden px-3 py-3 sm:px-4 sm:py-3.5",
+        "xl:col-span-2 flex min-h-0 flex-col gap-3 overflow-hidden bg-[rgb(var(--color-surface)/0.9)] px-3.5 py-3.5 sm:px-4 sm:py-4",
         className,
       )}
     >
@@ -332,7 +337,7 @@ export const ToolCodeBlock = ({
   return (
     <pre
       className={cn(
-        "min-h-[18rem] max-h-[60dvh] flex-1 overflow-auto rounded-[24px] border px-4 py-3 font-mono text-[12px] leading-6 whitespace-pre-wrap break-all xl:min-h-0 xl:max-h-none",
+        "min-h-[18rem] max-h-[60dvh] flex-1 overflow-auto rounded-[16px] border px-4 py-3 font-mono text-[12px] leading-6 whitespace-pre-wrap break-all xl:min-h-0 xl:max-h-none",
         hasValue ? "text-foreground" : "text-muted",
         toolInsetPanelClassName,
         className,
@@ -352,7 +357,7 @@ export const ToolEmptyState = ({
 }) => (
   <div
     className={cn(
-      "flex min-h-[220px] flex-1 items-center justify-center rounded-[24px] border border-dashed px-6 text-center text-sm leading-6 text-muted",
+      "flex min-h-[220px] flex-1 items-center justify-center rounded-[16px] border border-dashed px-6 text-center text-sm leading-6 text-muted",
       toolInsetPanelClassName,
       className,
     )}
@@ -384,7 +389,7 @@ export const ToolMetaItem = ({
 }) => (
   <div
     className={cn(
-      "rounded-[22px] border px-3 py-2.5",
+      "rounded-[16px] border px-3 py-2.5",
       toolInsetPanelClassName,
       className,
     )}
@@ -569,10 +574,10 @@ export const ToolSelect = ({
         ref={buttonRef}
         data-tool-select-trigger="true"
         className={cn(
-          "inline-flex h-10 min-w-0 max-w-full items-center justify-between gap-2 whitespace-nowrap rounded-[18px] border text-sm text-foreground outline-none transition-[background-color,border-color,color,box-shadow,transform] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
+          "inline-flex h-10 min-w-0 max-w-full items-center justify-between gap-2 whitespace-nowrap rounded-[14px] border text-sm text-foreground outline-none transition-[background-color,border-color,color,box-shadow] focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0",
           embedded
             ? "border-0 bg-transparent px-0 text-xs shadow-none hover:translate-y-0 hover:border-0 hover:bg-transparent hover:shadow-none focus:border-0 focus:shadow-none"
-            : "border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-surface-strong)/0.94))] px-3 shadow-[0_14px_26px_-26px_rgb(var(--color-shadow-ambient)/0.26)] hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.14)] focus:border-accent/26 focus:shadow-[0_0_0_4px_rgb(var(--color-accent)/0.08),0_18px_34px_-24px_rgb(var(--color-shadow-ambient)/0.4)]",
+            : "border-[rgb(var(--color-border)/0.22)] bg-[rgb(var(--color-surface)/0.82)] px-3 shadow-[0_10px_22px_-22px_rgb(var(--color-shadow-ambient)/0.24)] hover:border-[rgb(var(--color-border)/0.4)] hover:bg-surfaceStrong/88 focus:border-accent/60 focus:shadow-[0_0_0_3px_rgb(var(--color-accent)/0.14)]",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
@@ -600,7 +605,7 @@ export const ToolSelect = ({
             <div
               ref={panelRef}
               className={cn(
-                "fixed z-[90] overflow-hidden rounded-[20px] border p-1.5",
+                "fixed z-[90] overflow-hidden rounded-[16px] border p-1.5",
                 toolInsetPanelClassName,
               )}
               style={{
@@ -612,11 +617,11 @@ export const ToolSelect = ({
             >
               <div
                 className={cn(
-                  "max-h-full overflow-y-auto rounded-[18px] pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgb(var(--color-surface-muted)/0.72)_transparent]",
+                  "max-h-full overflow-y-auto rounded-[14px] pr-0.5 [scrollbar-gutter:stable] [scrollbar-width:thin] [scrollbar-color:rgb(var(--color-surface-muted)/0.72)_transparent]",
                   "[&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:my-2 [&::-webkit-scrollbar-track]:rounded-full",
-                  "[&::-webkit-scrollbar-track]:bg-[rgb(var(--color-border)/0.12)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[2px]",
-                  "[&::-webkit-scrollbar-thumb]:border-[rgb(var(--color-surface-strong)/0.86)] [&::-webkit-scrollbar-thumb]:bg-[linear-gradient(180deg,rgb(var(--color-surface-muted)/0.86),rgb(var(--color-border)/0.92))]",
-                  "[&::-webkit-scrollbar-thumb:hover]:bg-[linear-gradient(180deg,rgb(var(--color-accent)/0.62),rgb(var(--color-surface-muted)/0.96))]",
+                  "[&::-webkit-scrollbar-track]:bg-[rgb(var(--color-border)/0.08)] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[2px]",
+                  "[&::-webkit-scrollbar-thumb]:border-[rgb(var(--color-surface-strong)/0.92)] [&::-webkit-scrollbar-thumb]:bg-[rgb(var(--color-border)/0.28)]",
+                  "[&::-webkit-scrollbar-thumb:hover]:bg-[rgb(var(--color-accent)/0.42)]",
                 )}
               >
                 {options.map((option) => {
@@ -626,10 +631,10 @@ export const ToolSelect = ({
                     <button
                       key={option.value}
                       className={cn(
-                        "flex min-w-full items-center rounded-[15px] px-3 py-2 text-left text-sm transition-[background-color,color,box-shadow]",
+                        "flex min-w-full items-center rounded-[12px] px-3 py-2 text-left text-sm transition-[background-color,color,box-shadow]",
                         isSelected
-                          ? "bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-accent-soft)/0.84))] text-foreground shadow-[0_12px_20px_-18px_rgb(var(--color-shadow-warm)/0.18)]"
-                          : "text-foreground hover:bg-surfaceStrong/88",
+                          ? "bg-[rgb(var(--color-surface-muted)/0.8)] text-foreground shadow-[0_10px_20px_-20px_rgb(var(--color-shadow-ambient)/0.26)]"
+                          : "text-foreground hover:bg-surfaceStrong/72",
                       )}
                       type="button"
                       onClick={() => {
@@ -720,7 +725,7 @@ export const ToolSegmentedControl = ({
   <div
     data-tool-segmented="true"
     className={cn(
-      "inline-flex items-center gap-1 rounded-full border border-[rgb(var(--color-border)/calc(var(--control-border-alpha)-0.05))] bg-background/52 p-1 shadow-[0_10px_18px_-18px_rgb(var(--color-shadow-ambient)/0.18)]",
+      "inline-flex items-center gap-1 rounded-[14px] border border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface-muted)/0.66)] p-1",
       className,
     )}
   >
@@ -731,16 +736,14 @@ export const ToolSegmentedControl = ({
         <button
           key={option.value}
           className={cn(
-            "rounded-full px-3 py-1.5 text-xs font-medium transition-[background-color,color,box-shadow]",
+            "rounded-[12px] px-3 py-1.5 text-xs font-medium transition-[background-color,color,box-shadow]",
             isActive
-              ? "bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-accent-soft)/0.88))] text-foreground shadow-[0_14px_22px_-16px_rgb(var(--color-shadow-ambient)/0.22),0_8px_18px_-14px_rgb(var(--color-shadow-warm)/0.2)]"
+              ? "bg-[rgb(var(--color-surface)/0.92)] text-foreground shadow-[0_10px_20px_-20px_rgb(var(--color-shadow-ambient)/0.3)]"
               : "text-muted hover:text-foreground",
           )}
           type="button"
           onClick={() => {
-            if (!isActive) {
-              onValueChange(option.value);
-            }
+            onValueChange(option.value);
           }}
         >
           {option.label}

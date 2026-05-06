@@ -12,19 +12,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClassMap: Record<ButtonVariant, string> = {
   default:
-    "border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_28px_-24px_rgb(var(--color-shadow-ambient)/0.26)] hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.16)] disabled:border-border/60 disabled:bg-background/40 disabled:text-muted",
+    "border border-[rgb(var(--color-foreground)/0.14)] bg-foreground text-background shadow-[0_20px_36px_-24px_rgb(var(--color-shadow-ambient)/0.5)] hover:border-[rgb(var(--color-foreground)/0.18)] hover:bg-[rgb(var(--color-foreground)/0.94)] hover:shadow-[0_22px_38px_-24px_rgb(var(--color-shadow-ambient)/0.56)] active:translate-y-px disabled:border-transparent disabled:bg-foreground/14 disabled:text-muted",
   secondary:
-    "border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_28px_-24px_rgb(var(--color-shadow-ambient)/0.26)] hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.16)] disabled:border-border/60 disabled:bg-background/40 disabled:text-muted",
+    "border border-[rgb(var(--color-border)/0.28)] bg-[rgb(var(--color-surface)/0.9)] text-foreground shadow-[0_10px_20px_-20px_rgb(var(--color-shadow-ambient)/0.24)] hover:border-[rgb(var(--color-border)/0.44)] hover:bg-surfaceStrong/94 hover:shadow-[0_12px_22px_-22px_rgb(var(--color-shadow-ambient)/0.28)] active:translate-y-px disabled:border-border/22 disabled:bg-background/44 disabled:text-muted/76",
   ghost:
-    "border border-[rgb(var(--color-border)/calc(var(--control-border-alpha)-0.06))] bg-[linear-gradient(180deg,rgb(var(--color-background)/0.78),rgb(var(--color-surface)/0.84))] text-muted shadow-[0_10px_22px_-24px_rgb(var(--color-shadow-ambient)/0.24)] hover:-translate-y-0.5 hover:border-accent/14 hover:bg-accentSoft/28 hover:text-foreground hover:shadow-[0_16px_28px_-24px_rgb(var(--color-shadow-ambient)/0.3),0_8px_18px_-18px_rgb(var(--color-shadow-warm)/0.12)] disabled:border-border/50 disabled:bg-background/28 disabled:text-muted/70",
+    "border border-transparent bg-transparent text-muted shadow-none hover:bg-surfaceStrong/82 hover:text-foreground active:translate-y-px disabled:text-muted/62",
   outline:
-    "border border-[rgb(var(--color-border)/calc(var(--control-border-alpha)-0.04))] bg-[linear-gradient(180deg,rgb(var(--color-background)/0.82),rgb(var(--color-surface)/0.88))] text-foreground shadow-[0_12px_24px_-26px_rgb(var(--color-shadow-ambient)/0.24)] hover:border-accent/16 hover:bg-surface/92 hover:shadow-[0_16px_28px_-24px_rgb(var(--color-shadow-ambient)/0.28)] disabled:border-border/60 disabled:bg-background/32 disabled:text-muted"
+    "border border-[rgb(var(--color-border)/0.24)] bg-[rgb(var(--color-surface)/0.66)] text-foreground shadow-none hover:border-[rgb(var(--color-border)/0.46)] hover:bg-surfaceStrong/88 active:translate-y-px disabled:border-border/18 disabled:bg-background/30 disabled:text-muted/72"
 };
 
 const sizeClassMap: Record<ButtonSize, string> = {
-  default: "h-11 px-4 text-sm",
-  sm: "h-9 px-3 text-sm",
-  icon: "h-10 w-10 p-0 text-sm"
+  default: "h-10 px-4.5 text-sm",
+  sm: "h-9 px-3.5 text-sm",
+  icon: "h-9 w-9 p-0 text-sm"
 };
 
 export const Button = ({
@@ -36,7 +36,7 @@ export const Button = ({
 }: ButtonProps) => (
   <button
     className={cn(
-      "inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-2xl font-medium leading-none transition-[background-color,border-color,color,box-shadow,transform]",
+      "inline-flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-[14px] font-medium leading-none tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow,transform]",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/22 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       "disabled:cursor-not-allowed disabled:shadow-none",
       variantClassMap[variant],

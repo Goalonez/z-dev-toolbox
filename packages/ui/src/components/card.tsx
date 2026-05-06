@@ -5,9 +5,7 @@ import { cn } from "../lib";
 export const Card = ({ className, ...props }: HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "relative overflow-hidden rounded-[28px] border border-[rgb(var(--color-border)/var(--panel-shell-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.985),rgb(var(--color-surface-strong)/0.95))] shadow-panel backdrop-blur-[22px]",
-      "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_top_left,rgb(var(--color-panel-glow)/calc(var(--panel-glow-alpha)*1.6)),transparent_42%),radial-gradient(circle_at_top_right,rgb(var(--color-accent)/0.08),transparent_30%),linear-gradient(180deg,rgb(var(--color-panel-glow)/var(--panel-shell-sheen-alpha)),transparent_18%)] before:content-['']",
-      "after:pointer-events-none after:absolute after:inset-[1px] after:rounded-[27px] after:border after:border-[rgb(var(--color-panel-glow)/var(--panel-shell-outline-alpha))] after:content-['']",
+      "relative overflow-hidden rounded-[20px] border border-[rgb(var(--color-border)/var(--panel-shell-border-alpha))] bg-[rgb(var(--color-surface)/0.96)] shadow-[0_18px_40px_-36px_rgb(var(--color-shadow-ambient)/0.34)] backdrop-blur-[18px]",
       className,
     )}
     {...props}

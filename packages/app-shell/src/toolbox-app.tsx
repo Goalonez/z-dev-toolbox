@@ -85,12 +85,14 @@ const shellCopy: Record<
   {
     projectName: string;
     searchPlaceholder: string;
+    workspaceEyebrow: string;
     toolListLabel: string;
     noTools: string;
     emptyWorkspaceTitle: string;
     emptyWorkspaceDescription: string;
     repositoryLabel: string;
     settingsLabel: string;
+    settingsEyebrow: string;
     settingsTitle: string;
     closeSettingsLabel: string;
     localeLabel: string;
@@ -124,12 +126,14 @@ const shellCopy: Record<
   "zh-CN": {
     projectName: "Z Dev Toolbox",
     searchPlaceholder: "搜索工具",
+    workspaceEyebrow: "工作台",
     toolListLabel: "工具栏",
     noTools: "没有匹配项",
     emptyWorkspaceTitle: "没有匹配工具",
     emptyWorkspaceDescription: "请清除当前搜索条件，或尝试其他关键词。",
     repositoryLabel: "打开 GitHub 仓库",
     settingsLabel: "打开设置",
+    settingsEyebrow: "偏好",
     settingsTitle: "设置",
     closeSettingsLabel: "关闭设置",
     localeLabel: "切换中英文",
@@ -163,12 +167,14 @@ const shellCopy: Record<
   "en-US": {
     projectName: "Z Dev Toolbox",
     searchPlaceholder: "Search tools",
+    workspaceEyebrow: "Workspace",
     toolListLabel: "Toolbox",
     noTools: "No matches",
     emptyWorkspaceTitle: "No matching tool",
     emptyWorkspaceDescription: "Clear the query or try another keyword.",
     repositoryLabel: "Open GitHub repository",
     settingsLabel: "Open settings",
+    settingsEyebrow: "Preferences",
     settingsTitle: "Settings",
     closeSettingsLabel: "Close settings",
     localeLabel: "Switch language",
@@ -844,23 +850,26 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                 : text.updateStatusLatest;
 
   return (
-    <div className="min-h-dvh h-dvh overflow-hidden bg-background bg-shell-grid bg-[size:36px_36px] text-foreground">
-      <div className="mx-auto flex h-full w-full max-w-[1700px] px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-4">
-        <div className="grid h-full min-h-0 w-full gap-3 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[220px_minmax(0,1fr)] md:grid-rows-1">
-          <Card className="flex min-h-0 flex-col gap-2.5 overflow-hidden p-2.5 sm:gap-3 sm:p-3">
-            <div className="space-y-2 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] pb-2.5 md:space-y-3">
-              <div className="flex items-start justify-between gap-3 md:block md:text-center">
-                <div className="min-w-0 text-left md:text-center">
-                  <div className="truncate text-[1.15rem] font-semibold leading-none tracking-[-0.03em] text-foreground sm:text-[1.3rem] lg:text-[1.42rem]">
+    <div className="min-h-dvh h-dvh overflow-hidden bg-background bg-shell-grid bg-[size:32px_32px] text-foreground">
+      <div className="mx-auto flex h-full w-full max-w-[1680px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5 lg:py-5">
+        <div className="grid h-full min-h-0 w-full gap-3.5 grid-rows-[auto_minmax(0,1fr)] md:grid-cols-[248px_minmax(0,1fr)] md:grid-rows-1">
+          <Card className="flex min-h-0 flex-col gap-2.5 overflow-hidden bg-[rgb(var(--color-surface)/0.82)] p-3 shadow-[0_18px_40px_-34px_rgb(var(--color-shadow-ambient)/0.3)] sm:gap-3 sm:p-3.5">
+            <div className="space-y-2.5 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] pb-3.5 md:space-y-3">
+              <div className="flex items-start justify-between gap-2.5 md:block md:text-left">
+                <div className="min-w-0 text-left">
+                  <div className="text-[0.68rem] font-medium uppercase tracking-[0.24em] text-muted/84">
+                    {text.workspaceEyebrow}
+                  </div>
+                  <div className="mt-1.5 truncate font-brand text-[1.18rem] font-semibold leading-none tracking-[-0.03em] text-foreground sm:text-[1.32rem] lg:text-[1.46rem]">
                     {text.projectName}
                   </div>
                 </div>
-                <div className="flex items-center justify-start gap-1.5 md:mt-2 md:justify-center">
+                <div className="flex items-center justify-start gap-1 md:mt-2.5 md:justify-start">
                   <Button
                     aria-label={text.settingsLabel}
-                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    className="h-8.5 w-8.5 rounded-[12px]"
                     size="icon"
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => {
                       setIsSettingsOpen(true);
                     }}
@@ -869,9 +878,9 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                   </Button>
                   <Button
                     aria-label={text.localeLabel}
-                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    className="h-8.5 w-8.5 rounded-[12px]"
                     size="icon"
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => {
                       setLocale(locale === "zh-CN" ? "en-US" : "zh-CN");
                     }}
@@ -880,9 +889,9 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                   </Button>
                   <Button
                     aria-label={text.themeLabel}
-                    className="h-9 w-9 rounded-full sm:h-8 sm:w-8"
+                    className="h-8.5 w-8.5 rounded-[12px]"
                     size="icon"
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => {
                       setThemeMode(themeMode === "dark" ? "light" : "dark");
                     }}
@@ -892,8 +901,8 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                   <a
                     aria-label={text.repositoryLabel}
                     className={cn(
-                      "inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_28px_-24px_rgb(var(--color-shadow-ambient)/0.26)] transition-[background-color,border-color,color,box-shadow,transform] sm:h-8 sm:w-8",
-                      "hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.32),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/22 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      "inline-flex h-8.5 w-8.5 items-center justify-center rounded-[12px] border border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface)/0.72)] text-foreground transition-[background-color,border-color,color,box-shadow]",
+                      "hover:border-[rgb(var(--color-border)/0.36)] hover:bg-surfaceStrong/86 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     )}
                     href={REPOSITORY_URL}
                     rel="noreferrer"
@@ -905,12 +914,12 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               </div>
             </div>
 
-            <div className="space-y-2 md:hidden">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(9rem,42%)] gap-2">
+            <div className="space-y-2.5 md:hidden">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(9rem,42%)] gap-2.5">
                 <Input
                   ref={searchInputRef}
                   autoFocus
-                  className="h-11 rounded-[18px]"
+                  className="h-10 rounded-[14px] bg-[rgb(var(--color-surface)/0.82)]"
                   placeholder={text.searchPlaceholder}
                   type="search"
                   value={search}
@@ -932,7 +941,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                 />
                 <ToolSelect
                   aria-label={text.toolListLabel}
-                  className="h-11 w-full rounded-[18px] px-3 text-sm"
+                  className="h-10 w-full rounded-[14px] border-[rgb(var(--color-border)/0.22)] bg-[rgb(var(--color-surface)/0.82)] px-3 text-sm"
                   value={selectedTool?.manifest.id}
                   renderValue={() => selectedToolName || text.noTools}
                   onValueChange={(value: string) => {
@@ -961,13 +970,13 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
             </div>
 
             <div className="hidden space-y-2 md:block">
-              <div className="text-[0.65rem] font-medium uppercase tracking-[0.18em] text-muted sm:text-[0.68rem] sm:tracking-[0.24em]">
+              <div className="text-[0.62rem] font-medium uppercase tracking-[0.22em] text-muted/78">
                 {text.toolListLabel}
               </div>
               <Input
                 ref={searchInputRef}
                 autoFocus
-                className="h-11 rounded-[18px]"
+                className="h-9.5 rounded-[13px] bg-[rgb(var(--color-surface)/0.82)] px-3"
                 placeholder={text.searchPlaceholder}
                 type="search"
                 value={search}
@@ -989,7 +998,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               />
             </div>
 
-            <div className="hidden min-h-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:flex-1 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
+            <div className="hidden min-h-0 gap-1 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex md:flex-1 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
               {visibleTools.map((tool) => {
                 const manifest = getLocalizedManifest(tool.manifest, locale);
                 const isActive = tool.manifest.id === selectedTool?.manifest.id;
@@ -999,11 +1008,11 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                     key={tool.manifest.id}
                     data-tool-nav-item="true"
                     className={cn(
-                      "relative flex min-w-[132px] shrink-0 items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition-[background-color,border-color,color,transform,box-shadow] sm:min-w-[148px] md:w-full md:min-w-0 md:rounded-[19px]",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/24 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      "relative flex min-w-[132px] shrink-0 items-center gap-2.5 rounded-[13px] border px-2.5 py-2 text-left transition-[background-color,border-color,color,box-shadow] sm:min-w-[148px] md:w-full md:min-w-0",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       isActive
-                        ? "border-accent/30 bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.99),rgb(var(--color-accent-soft)/0.8))] text-foreground shadow-[0_18px_32px_-24px_rgb(var(--color-shadow-ambient)/0.34),0_8px_20px_-16px_rgb(var(--color-shadow-warm)/0.2)]"
-                        : "border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.97),rgb(var(--color-surface-strong)/0.94))] text-foreground shadow-[0_14px_26px_-24px_rgb(var(--color-shadow-ambient)/0.22)] hover:-translate-y-0.5 hover:border-accent/16 hover:bg-surfaceStrong/98 hover:shadow-[0_18px_30px_-22px_rgb(var(--color-shadow-ambient)/0.3),0_8px_20px_-18px_rgb(var(--color-shadow-warm)/0.14)]",
+                        ? "border-[rgb(var(--color-border)/0.24)] bg-[rgb(var(--color-surface)/0.94)] text-foreground shadow-[0_10px_22px_-24px_rgb(var(--color-shadow-ambient)/0.34)]"
+                        : "border-transparent bg-transparent text-muted hover:border-[rgb(var(--color-border)/0.14)] hover:bg-[rgb(var(--color-surface)/0.56)] hover:text-foreground",
                     )}
                     role="button"
                     tabIndex={0}
@@ -1036,7 +1045,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                     }}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium leading-5 sm:text-sm">
+                      <div className="truncate text-[12.5px] font-medium leading-5 sm:text-[13px]">
                         {manifest.name}
                       </div>
                     </div>
@@ -1045,7 +1054,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               })}
 
               {visibleTools.length === 0 ? (
-                <div className="flex h-24 min-w-[132px] shrink-0 items-center justify-center rounded-[20px] border border-dashed border-border bg-background/35 px-4 text-sm text-muted md:h-32 md:min-w-0 md:rounded-[22px]">
+                <div className="flex h-24 min-w-[132px] shrink-0 items-center justify-center rounded-[16px] border border-dashed border-border/24 bg-surface/52 px-4 text-sm text-muted md:h-32 md:min-w-0">
                   {text.noTools}
                 </div>
               ) : null}
@@ -1054,7 +1063,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
 
           <div
             ref={workspaceRef}
-            className="min-h-0 overflow-x-hidden overflow-y-auto px-0.5 py-0.5 xl:overflow-hidden"
+            className="min-h-0 overflow-x-hidden overflow-y-auto rounded-[22px] border border-[rgb(var(--color-border)/0.1)] bg-[rgb(var(--color-surface)/0.42)] px-1 py-1 shadow-[inset_0_1px_0_rgb(var(--color-panel-glow)/0.16)] xl:overflow-hidden"
           >
             {ActivePanel ? (
               <ActivePanel
@@ -1067,7 +1076,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                 storage={storage}
               />
             ) : (
-              <div className="flex h-full min-h-0 items-center justify-center rounded-[26px] border border-dashed border-[rgb(var(--color-border)/var(--divider-border-alpha))] bg-background/34 px-6 text-center text-sm text-muted">
+              <div className="flex h-full min-h-0 items-center justify-center rounded-[18px] border border-dashed border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface)/0.72)] px-6 text-center text-sm text-muted">
                 <div className="space-y-2">
                   <div className="text-base font-medium text-foreground">
                     {text.emptyWorkspaceTitle}
@@ -1080,41 +1089,31 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         </div>
       </div>
       {toast ? (
-        <div className="pointer-events-none fixed inset-x-3 top-3 z-50 md:left-auto md:right-4 md:top-4">
+        <div className="pointer-events-none fixed inset-x-3 top-3 z-50 md:left-auto md:right-5 md:top-5">
           <div
             className={cn(
-              "relative flex max-w-none items-start gap-3 overflow-hidden rounded-[20px] border px-4 py-3 text-sm text-foreground shadow-[0_8px_18px_-16px_rgb(var(--color-shadow-ambient)/0.1)] backdrop-blur-[6px] md:max-w-[340px]",
+              "flex max-w-none items-start gap-3 rounded-[16px] border px-4 py-3 text-sm text-foreground shadow-[0_18px_34px_-28px_rgb(var(--color-shadow-ambient)/0.32)] backdrop-blur-[18px] md:max-w-[340px]",
               toast.tone === "error"
-                ? "border-danger/12 bg-[rgb(var(--color-surface)/0.24)]"
+                ? "border-danger/24 bg-[rgb(var(--color-surface)/0.9)]"
                 : toast.tone === "success"
-                  ? "border-accent/12 bg-[rgb(var(--color-surface)/0.24)]"
-                  : "border-[rgb(var(--color-border)/0.14)] bg-[rgb(var(--color-surface)/0.24)]",
+                  ? "border-success/24 bg-[rgb(var(--color-surface)/0.9)]"
+                  : "border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface)/0.9)]",
             )}
           >
             <span
               className={cn(
-                "absolute inset-y-0 left-0 w-1.5",
+                "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border",
                 toast.tone === "error"
-                  ? "bg-danger"
+                  ? "border-danger/22 bg-danger/10 text-danger"
                   : toast.tone === "success"
-                    ? "bg-accent"
-                    : "bg-[rgb(var(--color-accent)/0.8)]",
-              )}
-            />
-            <span
-              className={cn(
-                "mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl border",
-                toast.tone === "error"
-                  ? "border-danger/12 bg-danger/5 text-danger"
-                  : toast.tone === "success"
-                    ? "border-accent/12 bg-accentSoft/18 text-accent"
-                    : "border-[rgb(var(--color-border)/0.2)] bg-[rgb(var(--color-surface-muted)/0.06)] text-accent",
+                    ? "border-success/22 bg-success/10 text-success"
+                    : "border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface-muted)/0.66)] text-accent",
               )}
             >
               <ToastIcon tone={toast.tone} />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
                 {getToastTitle(toast.tone, locale)}
               </div>
               <div className="mt-1 break-words text-sm font-medium leading-5 text-foreground">
@@ -1125,7 +1124,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         </div>
       ) : null}
       {isSettingsOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[radial-gradient(circle_at_top,rgb(var(--color-accent)/0.16),transparent_28%),rgb(var(--color-shadow-ambient)/0.48)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.42)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4">
           <button
             aria-label={text.closeSettingsLabel}
             className="absolute inset-0"
@@ -1134,22 +1133,26 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               setIsSettingsOpen(false);
             }}
           />
-          <Card className="relative z-10 w-full max-w-[29rem] overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.99),rgb(var(--color-surface-strong)/0.95))] p-0 shadow-[0_42px_96px_-42px_rgb(var(--color-shadow-ambient)/0.56),0_14px_28px_-18px_rgb(var(--color-shadow-warm)/0.18)] sm:rounded-[32px]">
-            <div className="pointer-events-none absolute inset-x-8 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-accent-soft)/0.72),transparent_70%)] blur-2xl" />
-            <div className="relative flex items-center justify-between gap-4 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] px-4 py-4">
+          <Card className="relative z-10 w-full max-w-[30rem] overflow-hidden rounded-[24px] bg-[rgb(var(--color-surface)/0.94)] p-0 shadow-[0_26px_54px_-34px_rgb(var(--color-shadow-ambient)/0.4)] sm:rounded-[26px]">
+            <div className="relative flex items-center justify-between gap-4 border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] px-5 py-5">
               <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-[1rem] border border-accent/14 bg-accentSoft/74 text-accent shadow-[0_14px_26px_-20px_rgb(var(--color-shadow-warm)/0.16)]">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-surface-muted)/0.66)] text-accent">
                   <SettingsIcon />
                 </span>
-                <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-muted">
-                  {text.settingsTitle}
+                <div>
+                  <div className="text-[0.66rem] font-semibold uppercase tracking-[0.22em] text-muted/84">
+                    {text.settingsEyebrow}
+                  </div>
+                  <div className="mt-1 text-sm font-medium text-foreground">
+                    {text.settingsTitle}
+                  </div>
                 </div>
               </div>
               <Button
                 aria-label={text.closeSettingsLabel}
-                className="h-9 w-9 rounded-full"
+                className="h-9 w-9 rounded-[13px]"
                 size="icon"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   setIsSettingsOpen(false);
                 }}
@@ -1159,7 +1162,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
             </div>
             <div className="space-y-3 px-4 py-4">
               <button
-                className="group flex w-full items-center justify-between gap-4 rounded-[24px] border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.96),rgb(var(--color-surface-strong)/0.92))] px-4 py-4 text-left shadow-[0_18px_32px_-28px_rgb(var(--color-shadow-ambient)/0.3)] transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-accent/18 hover:shadow-[0_22px_38px_-28px_rgb(var(--color-shadow-ambient)/0.36),0_8px_20px_-16px_rgb(var(--color-shadow-warm)/0.16)]"
+                className="group flex w-full items-center justify-between gap-4 rounded-[16px] border border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface)/0.72)] px-4 py-4 text-left transition-[border-color,background-color,box-shadow] hover:border-[rgb(var(--color-border)/0.34)] hover:bg-[rgb(var(--color-surface)/0.88)] hover:shadow-[0_16px_28px_-28px_rgb(var(--color-shadow-ambient)/0.34)]"
                 type="button"
                 onClick={() => {
                   setAutoCopyOnSuccess(!autoCopyOnSuccess);
@@ -1175,22 +1178,22 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                 </div>
                 <span
                   className={cn(
-                    "relative inline-flex h-8 w-14 rounded-full border shadow-[0_12px_24px_-18px_rgb(var(--color-shadow-ambient)/0.24)] transition-[background-color,border-color]",
+                    "relative inline-flex h-8 w-14 rounded-full border transition-[background-color,border-color]",
                     autoCopyOnSuccess
-                      ? "border-accent/32 bg-[linear-gradient(135deg,rgb(var(--color-accent)/0.9),rgb(var(--color-accent-soft)/0.96))]"
-                      : "border-[rgb(var(--color-border)/0.54)] bg-[linear-gradient(180deg,rgb(var(--color-surface-muted)/0.46),rgb(var(--color-background)/0.7))]",
+                      ? "border-accent/24 bg-accent"
+                      : "border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface-muted)/0.8)]",
                   )}
                 >
                   <span
                     className={cn(
-                      "absolute top-0.5 h-6 w-6 rounded-full border border-[rgb(var(--color-border)/0.56)] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.98),rgb(var(--color-surface-strong)/0.92))] shadow-[0_8px_16px_-10px_rgb(var(--color-shadow-ambient)/0.5)] transition-transform",
+                      "absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_8px_16px_-12px_rgb(var(--color-shadow-ambient)/0.4)] transition-transform",
                       autoCopyOnSuccess ? "left-[1.8rem]" : "left-0.5",
                     )}
                   />
                 </span>
               </button>
               {isDesktopPlatform ? (
-                <div className="rounded-[24px] border border-[rgb(var(--color-border)/var(--control-border-alpha))] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.96),rgb(var(--color-surface-strong)/0.92))] px-4 py-4 shadow-[0_18px_32px_-28px_rgb(var(--color-shadow-ambient)/0.3)]">
+                <div className="rounded-[16px] border border-[rgb(var(--color-border)/0.18)] bg-[rgb(var(--color-surface)/0.72)] px-4 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-foreground">
@@ -1218,7 +1221,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                     </Button>
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[18px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-3.5 py-3">
+                    <div className="rounded-[16px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-background)/0.4)] px-3.5 py-3">
                       <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
                         {text.currentVersionLabel}
                       </div>
@@ -1226,7 +1229,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                         {updateState.currentVersion || "..."}
                       </div>
                     </div>
-                    <div className="rounded-[18px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-3.5 py-3">
+                    <div className="rounded-[16px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-background)/0.4)] px-3.5 py-3">
                       <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
                         {text.availableVersionLabel}
                       </div>
@@ -1240,7 +1243,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                       ) : null}
                     </div>
                   </div>
-                  <div className="mt-4 rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+                  <div className="mt-4 rounded-[18px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-background)/0.4)] px-4 py-3.5">
                     <div className="text-sm font-medium text-foreground">
                       {updateStatusText}
                     </div>
@@ -1256,7 +1259,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
                     ) : null}
                   </div>
                   {availableUpdate ? (
-                    <div className="mt-4 rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+                    <div className="mt-4 rounded-[18px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-background)/0.4)] px-4 py-3.5">
                       <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
                         {text.releaseNotesLabel}
                       </div>
@@ -1288,7 +1291,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         </div>
       ) : null}
       {isUpdatePromptOpen && availableUpdate ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[radial-gradient(circle_at_top,rgb(var(--color-accent)/0.14),transparent_30%),rgb(var(--color-shadow-ambient)/0.56)] px-3 py-3 backdrop-blur-[12px] sm:items-center sm:px-4">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.46)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4">
           <button
             aria-label={text.dismissUpdateLabel}
             className="absolute inset-0"
@@ -1300,8 +1303,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               }
             }}
           />
-          <Card className="relative z-10 w-full max-w-[32rem] overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgb(var(--color-surface)/0.99),rgb(var(--color-surface-strong)/0.95))] p-0 shadow-[0_46px_104px_-44px_rgb(var(--color-shadow-ambient)/0.6),0_16px_32px_-20px_rgb(var(--color-shadow-warm)/0.18)] sm:rounded-[32px]">
-            <div className="pointer-events-none absolute inset-x-8 top-0 h-20 bg-[radial-gradient(circle_at_top,rgb(var(--color-accent-soft)/0.72),transparent_70%)] blur-2xl" />
+          <Card className="relative z-10 w-full max-w-[32rem] overflow-hidden rounded-[24px] bg-[rgb(var(--color-surface)/0.94)] p-0 shadow-[0_28px_56px_-36px_rgb(var(--color-shadow-ambient)/0.42)] sm:rounded-[26px]">
             <div className="relative border-b border-[rgb(var(--color-border)/var(--divider-border-alpha))] px-5 py-5">
               <div className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-muted">
                 {text.updatePromptTitle}
@@ -1321,7 +1323,7 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
               </div>
             </div>
             <div className="space-y-4 px-5 py-5">
-              <div className="rounded-[20px] border border-[rgb(var(--color-border)/0.46)] bg-[rgb(var(--color-background)/0.24)] px-4 py-3.5">
+              <div className="rounded-[16px] border border-[rgb(var(--color-border)/0.16)] bg-[rgb(var(--color-surface)/0.72)] px-4 py-3.5">
                 <div className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-muted">
                   {text.releaseNotesLabel}
                 </div>
