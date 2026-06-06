@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { generateQrCode } from "@z-dev-toolbox/core";
 import type { Locale } from "@z-dev-toolbox/shared";
@@ -21,6 +21,7 @@ import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:qr.code:draft:v2";
 const QR_SIZE = 240;
+const AUTO_RUN_DELAY_MS = 300;
 
 type QrPanelMode = "generate" | "parse";
 type QrExportFormat = "png" | "svg" | "base64";
@@ -257,6 +258,10 @@ export const QrCodePanel = ({
   const [svg, setSvg] = useState("");
   const [parsedImage, setParsedImage] = useState<ParsedImageState | null>(null);
   const [parsedResult, setParsedResult] = useState<ParsedQrResult | null>(null);
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
+  const latestGenerateRunRef = useRef(0);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
     bridge,
@@ -265,6 +270,22 @@ export const QrCodePanel = ({
     notify,
   });
 
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (autoRunTimeoutRef.current) {
+        window.clearTimeout(autoRunTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const resetResults = () => {
     setSvg("");
     setParsedResult(null);
@@ -272,19 +293,41 @@ export const QrCodePanel = ({
   };
 
   const updateDraft = (value: Partial<typeof draft>) => {
-    setDraft((current) => ({ ...current, ...value }));
+    const nextDraft = {
+      ...draft,
+      ...value,
+    };
+
+    setDraft(nextDraft);
     resetResults();
+    scheduleGenerate(nextDraft);
   };
 
-  const runGenerate = async () => {
+  const runGenerate = async (textValue = draft.text) => {
+    clearAutoRunTimeout();
+
+    const runId = latestGenerateRunRef.current + 1;
+
+    latestGenerateRunRef.current = runId;
+
+    if (!textValue.trim()) {
+      setSvg("");
+      setFeedback(null);
+      return;
+    }
+
     const nextResult = await generateQrCode({
-      text: draft.text,
+      text: textValue,
       size: QR_SIZE,
       margin: 1,
       darkColor: "#111827",
       lightColor: "#FFFFFFFF",
       errorCorrectionLevel: "M",
     });
+
+    if (latestGenerateRunRef.current !== runId) {
+      return;
+    }
 
     if (!nextResult.ok) {
       setSvg("");
@@ -297,6 +340,21 @@ export const QrCodePanel = ({
 
     setSvg(nextResult.data.svg);
     reportSuccess(text.generated);
+  };
+
+  const scheduleGenerate = (input: typeof draft) => {
+    clearAutoRunTimeout();
+
+    if (input.mode !== "generate" || !input.text.trim()) {
+      latestGenerateRunRef.current += 1;
+      setSvg("");
+      setFeedback(null);
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      void runGenerate(input.text);
+    }, AUTO_RUN_DELAY_MS);
   };
 
   const handleParsedFile = async (file: File) => {

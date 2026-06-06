@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   analyzeCrontab,
@@ -23,6 +23,7 @@ import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:crontab.preview:draft:v2";
 const DEFAULT_COUNT = 15;
+const AUTO_RUN_DELAY_MS = 300;
 
 type CronDraftPrecision = "minute" | "second";
 
@@ -226,14 +227,33 @@ export const CrontabPanel = ({
     copyFailedText: common.copyFailed,
     notify
   });
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
 
-  const updateDraft = (value: Partial<typeof draft>) => {
-    setDraft((current) => ({ ...current, ...value }));
-    setResult(null);
-    setFeedback(null);
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
   };
 
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
   const runAnalyze = (expression = draft.expression) => {
+    clearAutoRunTimeout();
+
+    if (!expression.trim()) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
     const nextResult = analyzeCrontab({
       expression,
       count: DEFAULT_COUNT,
@@ -256,6 +276,33 @@ export const CrontabPanel = ({
     );
   };
 
+  const scheduleAnalyze = (expression: string) => {
+    clearAutoRunTimeout();
+
+    if (!expression.trim()) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      runAnalyze(expression);
+    }, AUTO_RUN_DELAY_MS);
+  };
+
+  const updateDraft = (value: Partial<typeof draft>) => {
+    setDraft((current) => ({ ...current, ...value }));
+    setResult(null);
+    setFeedback(null);
+  };
+
+  const updateExpression = (expression: string) => {
+    setDraft((current) => ({ ...current, expression }));
+    setResult(null);
+    setFeedback(null);
+    scheduleAnalyze(expression);
+  };
+
   const fieldOrder =
     draft.precision === "second"
       ? (["second", "minute", "hour", "dayOfMonth", "month", "dayOfWeek"] as const)
@@ -272,7 +319,7 @@ export const CrontabPanel = ({
             spellCheck={false}
             value={draft.expression}
             onChange={(event) => {
-              updateDraft({ expression: event.currentTarget.value });
+              updateExpression(event.currentTarget.value);
             }}
           />
         </div>

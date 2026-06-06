@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatXml,
@@ -22,6 +22,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:xml.format:draft:v1";
+const AUTO_RUN_DELAY_MS = 350;
 
 const panelCopy: Record<
   Locale,
@@ -122,6 +123,9 @@ export const XmlFormatPanel = ({
     defaultDraft,
   );
   const draft = useMemo(() => normalizeXmlDraft(rawDraft), [rawDraft]);
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
   const [result, setResult] = useState<XmlFormatOutput | null>(null);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
@@ -131,22 +135,44 @@ export const XmlFormatPanel = ({
     notify,
   });
 
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
   const resetResult = () => {
     setResult(null);
     setFeedback(null);
   };
 
   const updateDraft = (value: Partial<XmlFormatInput>) => {
+    const nextInput = normalizeXmlDraft({
+      ...draft,
+      ...value,
+    });
+
     resetResult();
-    setDraft((current) =>
-      normalizeXmlDraft({
-        ...normalizeXmlDraft(current),
-        ...value,
-      }),
-    );
+    setDraft(nextInput);
+    scheduleFormat(nextInput);
   };
 
   const executeFormat = (input: XmlFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
     const nextResult = formatXml(input);
 
     if (!nextResult.ok) {
@@ -160,6 +186,19 @@ export const XmlFormatPanel = ({
 
     setResult(nextResult.data);
     reportSuccess(text.successMessage[input.mode], nextResult.data.formatted);
+  };
+
+  const scheduleFormat = (input: XmlFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      executeFormat(input);
+    }, AUTO_RUN_DELAY_MS);
   };
 
   const runFormat = (mode: XmlFormatInput["mode"]) => {
@@ -253,13 +292,8 @@ export const XmlFormatPanel = ({
                 };
 
                 setDraft(nextInput);
-
-                if (result && nextInput.source.trim()) {
-                  executeFormat(nextInput);
-                  return;
-                }
-
                 resetResult();
+                scheduleFormat(nextInput);
               }}
             >
               {indentOptions.map((option) => (

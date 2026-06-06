@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   generateSnowflakeIds,
@@ -156,7 +156,7 @@ export const SnowflakePanel = ({
 }: ToolPanelProps) => {
   const text = panelCopy[locale];
   const common = commonPanelCopy[locale];
-  const [rawPersistedDraft, setPersistedDraft] = useToolDraftState<PersistedSnowflakeDraft>(
+  const [rawPersistedDraft, setPersistedDraft, hydrated] = useToolDraftState<PersistedSnowflakeDraft>(
     storage,
     TOOL_DRAFT_KEY,
     defaultPersistedDraft,
@@ -168,6 +168,7 @@ export const SnowflakePanel = ({
   const [timestamp, setTimestamp] = useState(createCurrentTimestamp);
   const [timestampMode, setTimestampMode] = useState<TimestampMode>("auto");
   const [result, setResult] = useState<SnowflakeOutput | null>(null);
+  const initializedRef = useRef(false);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
     bridge,
@@ -176,10 +177,13 @@ export const SnowflakePanel = ({
     notify,
   });
 
-  const draft: SnowflakeDraft = {
-    ...persistedDraft,
-    timestamp,
-  };
+  const draft: SnowflakeDraft = useMemo(
+    () => ({
+      ...persistedDraft,
+      timestamp,
+    }),
+    [persistedDraft, timestamp],
+  );
 
   const resetState = () => {
     setResult(null);
@@ -196,7 +200,7 @@ export const SnowflakePanel = ({
     resetState();
   };
 
-  const runGenerate = () => {
+  const runGenerate = useCallback(() => {
     const currentTimestamp =
       timestampMode === "auto" ? createCurrentTimestamp() : draft.timestamp;
 
@@ -227,7 +231,16 @@ export const SnowflakePanel = ({
       locale === "zh-CN" ? "雪花 ID 已生成" : "Generated",
       stringifySnowflake(nextResult.data),
     );
-  };
+  }, [draft, locale, reportSuccess, setFeedback, text.errorMessage, timestampMode]);
+
+  useEffect(() => {
+    if (!hydrated || initializedRef.current) {
+      return;
+    }
+
+    initializedRef.current = true;
+    runGenerate();
+  }, [hydrated, runGenerate]);
 
   return (
     <ToolGrid docked>

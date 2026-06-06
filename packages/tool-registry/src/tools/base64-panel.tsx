@@ -292,20 +292,37 @@ export const Base64Panel = ({
     }
   };
 
-  const runTransform = (mode: Base64Input["mode"]) => {
+  const executeTransform = (
+    input: typeof draft,
+    image: ImageDraftState | null = imageDraft,
+  ) => {
+    if (
+      input.contentType === "text" &&
+      input.source.length === 0
+    ) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    if (input.contentType === "image" && !image) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
     const nextInput: Base64Input = {
-      source: draft.source,
-      mode,
-      contentType: draft.contentType,
+      source: input.source,
+      mode: input.mode,
+      contentType: input.contentType,
       urlSafe: false,
       imageBytes:
-        draft.contentType === "image" && mode === "encode"
-          ? imageDraft?.bytes
+        input.contentType === "image" && input.mode === "encode"
+          ? image?.bytes
           : undefined,
-      imageMimeType: imageDraft?.mimeType ?? "image/png",
+      imageMimeType: image?.mimeType ?? "image/png",
     };
 
-    updateDraft({ mode }, { preserveResult: true });
     const nextResult = transformBase64(nextInput);
 
     if (!nextResult.ok) {
@@ -329,26 +346,55 @@ export const Base64Panel = ({
 
     reportSuccess(
       locale === "zh-CN"
-        ? `${mode === "encode" ? "编码" : "解码"}完成`
-        : `${mode === "encode" ? "Encoded" : "Decoded"}`,
+        ? `${input.mode === "encode" ? "编码" : "解码"}完成`
+        : `${input.mode === "encode" ? "Encoded" : "Decoded"}`,
       stringifyResult(
         nextResult.data,
         {
-          dataUrlOutput: draft.dataUrlOutput,
-          urlSafeOutput: draft.urlSafeOutput,
+          dataUrlOutput: input.dataUrlOutput,
+          urlSafeOutput: input.urlSafeOutput,
         },
-        draft.contentType,
+        input.contentType,
       ),
     );
+  };
+
+  const runTransform = (mode: Base64Input["mode"]) => {
+    const nextDraft = {
+      ...draft,
+      mode,
+    };
+
+    updateDraft({ mode }, { preserveResult: true });
+    executeTransform(nextDraft);
+  };
+
+  const updateAndTransformText = (source: string) => {
+    const nextDraft = {
+      ...draft,
+      source,
+      contentType: "text" as const,
+    };
+
+    updateDraft({ source });
+    executeTransform(nextDraft);
   };
 
   const handleImageFile = async (file: File) => {
     try {
       const nextImage = await loadImageFile(file);
+      const nextDraft = {
+        ...draft,
+        contentType: "image" as const,
+        mode: "encode" as const,
+        source: "",
+      };
 
       setImageDraft(nextImage);
       setResult(null);
       setFeedback(null);
+      setDraft(nextDraft);
+      executeTransform(nextDraft, nextImage);
     } catch (error) {
       setFeedback({
         tone: "error",
@@ -408,7 +454,7 @@ export const Base64Panel = ({
             spellCheck={false}
             value={draft.source}
             onChange={(event) => {
-              updateDraft({ source: event.currentTarget.value });
+              updateAndTransformText(event.currentTarget.value);
             }}
           />
         ) : (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   convertTimestamp,
@@ -14,12 +14,9 @@ import {
   ToolGrid,
   ToolPane,
 } from "../components/tool-panel-kit";
-import { useToolDraftState } from "../components/use-tool-draft-state";
 import { useToolFeedback } from "../components/use-tool-feedback";
 import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
-
-const TOOL_DRAFT_KEY = "tool:timestamp.convert:draft";
 
 const panelCopy: Record<
   Locale,
@@ -103,24 +100,24 @@ const stringifyTimestampResult = (result: TimestampOutput, locale: Locale) =>
     `${locale === "zh-CN" ? "毫秒时间戳" : "Epoch milliseconds"}: ${result.epochMilliseconds}`,
   ].join("\n");
 
+const createCurrentTimestampInput = (): TimestampInput => ({
+  value: String(Date.now()),
+  source: "auto",
+});
+
 export const TimestampPanel = ({
   autoCopyOnSuccess,
   bridge,
   locale,
   notify,
-  storage,
 }: ToolPanelProps) => {
   const text = panelCopy[locale];
   const common = commonPanelCopy[locale];
-  const [draft, setDraft] = useToolDraftState<TimestampInput>(
-    storage,
-    TOOL_DRAFT_KEY,
-    {
-      value: String(Date.now()),
-      source: "auto",
-    },
+  const [draft, setDraft] = useState<TimestampInput>(
+    createCurrentTimestampInput,
   );
   const [result, setResult] = useState<TimestampOutput | null>(null);
+  const initializedRef = useRef(false);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
     bridge,
@@ -129,16 +126,13 @@ export const TimestampPanel = ({
     notify,
   });
 
-  const updateDraft = (value: string) => {
-    setDraft({
-      value,
-      source: "auto",
-    });
-    setResult(null);
-    setFeedback(null);
-  };
+  const executeConvert = useCallback((input: TimestampInput) => {
+    if (!input.value.trim()) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
 
-  const runConvert = (input: TimestampInput) => {
     const nextResult = convertTimestamp(input);
 
     if (!nextResult.ok) {
@@ -155,6 +149,29 @@ export const TimestampPanel = ({
       locale === "zh-CN" ? "时间解析完成" : "Parsed",
       stringifyTimestampResult(nextResult.data, locale),
     );
+  }, [locale, reportSuccess, setFeedback, text.errorMessage]);
+
+  useEffect(() => {
+    if (initializedRef.current) {
+      return;
+    }
+
+    initializedRef.current = true;
+
+    const nextInput = createCurrentTimestampInput();
+
+    setDraft(nextInput);
+    executeConvert(nextInput);
+  }, [executeConvert]);
+
+  const updateAndConvert = (value: string) => {
+    const nextInput: TimestampInput = {
+      value,
+      source: "auto",
+    };
+
+    setDraft(nextInput);
+    executeConvert(nextInput);
   };
 
   return (
@@ -166,7 +183,7 @@ export const TimestampPanel = ({
           spellCheck={false}
           value={draft.value}
           onChange={(event) => {
-            updateDraft(event.currentTarget.value);
+            updateAndConvert(event.currentTarget.value);
           }}
         />
       </ToolPane>
@@ -186,7 +203,7 @@ export const TimestampPanel = ({
               data-tool-primary-action="true"
               size="sm"
               onClick={() => {
-                runConvert({
+                executeConvert({
                   value: draft.value,
                   source: "auto",
                 });
@@ -198,7 +215,7 @@ export const TimestampPanel = ({
               size="sm"
               variant="ghost"
               onClick={() => {
-                updateDraft(String(Date.now()));
+                updateAndConvert(String(Date.now()));
               }}
             >
               {common.clear}

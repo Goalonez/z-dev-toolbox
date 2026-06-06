@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { evaluateRegex, type RegexOutput } from "@z-dev-toolbox/core";
 import type { Locale } from "@z-dev-toolbox/shared";
@@ -18,6 +18,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:regex.playground:draft:v2";
+const AUTO_RUN_DELAY_MS = 350;
 
 const regexPresetOptions = [
   {
@@ -249,15 +250,26 @@ export const RegexPanel = ({
     copyFailedText: common.copyFailed,
     notify
   });
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
 
-  const updateDraft = (value: Partial<typeof draft>) => {
-    setResult(null);
-    setFeedback(null);
-    setDraft((current) => ({ ...current, ...value }));
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
   };
 
-  const runRegex = () => {
-    const nextResult = evaluateRegex(draft);
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
+  const runRegex = (input = draft) => {
+    const nextResult = evaluateRegex(input);
 
     if (!nextResult.ok) {
       setResult(null);
@@ -273,6 +285,32 @@ export const RegexPanel = ({
       locale === "zh-CN" ? "正则已执行" : "Executed",
       stringifyRegexResult(nextResult.data, locale),
     );
+  };
+
+  const scheduleRegex = (input: typeof draft) => {
+    clearAutoRunTimeout();
+
+    if (input.pattern.length === 0 || input.source.length === 0) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      runRegex(input);
+    }, AUTO_RUN_DELAY_MS);
+  };
+
+  const updateDraft = (value: Partial<typeof draft>) => {
+    const nextDraft = {
+      ...draft,
+      ...value
+    };
+
+    setResult(null);
+    setFeedback(null);
+    setDraft(nextDraft);
+    scheduleRegex(nextDraft);
   };
 
   return (
@@ -380,7 +418,10 @@ export const RegexPanel = ({
             <Button
               data-tool-primary-action="true"
               size="sm"
-              onClick={runRegex}
+              onClick={() => {
+                clearAutoRunTimeout();
+                runRegex();
+              }}
             >
               {text.runAction}
             </Button>

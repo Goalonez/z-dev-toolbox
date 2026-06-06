@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { hashText, type HashOutput } from "@z-dev-toolbox/core";
 import type { Locale } from "@z-dev-toolbox/shared";
@@ -16,6 +16,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:hash.digest:draft";
+const AUTO_RUN_DELAY_MS = 200;
 
 const panelCopy: Record<
   Locale,
@@ -69,12 +70,36 @@ export const HashPanel = ({
     notify
   });
   const latestRunRef = useRef(0);
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
 
-  const runHash = async () => {
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
+  const executeHash = async (value: string) => {
     const runId = latestRunRef.current + 1;
 
     latestRunRef.current = runId;
-    const nextResult = await hashText({ source });
+
+    if (value.length === 0) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    const nextResult = await hashText({ source: value });
 
     if (latestRunRef.current !== runId) {
       return;
@@ -96,6 +121,21 @@ export const HashPanel = ({
     );
   };
 
+  const scheduleHash = (value: string) => {
+    clearAutoRunTimeout();
+
+    if (value.length === 0) {
+      latestRunRef.current += 1;
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      void executeHash(value);
+    }, AUTO_RUN_DELAY_MS);
+  };
+
   return (
     <ToolGrid docked>
       <ToolPane title={text.title}>
@@ -105,9 +145,12 @@ export const HashPanel = ({
           spellCheck={false}
           value={source}
           onChange={(event) => {
-            setSource(event.currentTarget.value);
+            const nextSource = event.currentTarget.value;
+
+            setSource(nextSource);
             setResult(null);
             setFeedback(null);
+            scheduleHash(nextSource);
           }}
         />
       </ToolPane>
@@ -126,7 +169,10 @@ export const HashPanel = ({
             <Button
               data-tool-primary-action="true"
               size="sm"
-              onClick={() => void runHash()}
+              onClick={() => {
+                clearAutoRunTimeout();
+                void executeHash(source);
+              }}
             >
               {common.run}
             </Button>

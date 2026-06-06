@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatJson,
@@ -27,6 +27,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:json.format:draft:v2";
+const AUTO_RUN_DELAY_MS = 250;
 
 const keyNamingOptions = [
   {
@@ -301,6 +302,9 @@ export const JsonFormatPanel = ({
   const [displayMode, setDisplayMode] = useState<"view" | "text">(
     getDefaultDisplayMode(defaultDraft),
   );
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
   const [collapsedPaths, setCollapsedPaths] = useState<Record<string, boolean>>(
     {},
   );
@@ -312,23 +316,34 @@ export const JsonFormatPanel = ({
     notify,
   });
 
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
   const resetResult = () => {
     setResult(null);
     setFeedback(null);
     setCollapsedPaths({});
   };
 
-  const updateDraft = (value: Partial<JsonFormatInput>) => {
-    resetResult();
-    setDraft((current) =>
-      normalizeJsonDraft({
-        ...normalizeJsonDraft(current),
-        ...value,
-      }),
-    );
-  };
-
   const executeFormat = (input: JsonFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
     const nextResult = formatJson(input);
 
     if (!nextResult.ok) {
@@ -343,6 +358,30 @@ export const JsonFormatPanel = ({
     setResult(nextResult.data);
     setCollapsedPaths({});
     reportSuccess(getSuccessMessage(input, text), nextResult.data.formatted);
+  };
+
+  const scheduleFormat = (input: JsonFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      executeFormat(input);
+    }, AUTO_RUN_DELAY_MS);
+  };
+
+  const updateDraft = (value: Partial<JsonFormatInput>) => {
+    const nextInput = normalizeJsonDraft({
+      ...draft,
+      ...value,
+    });
+
+    resetResult();
+    setDraft(nextInput);
+    scheduleFormat(nextInput);
   };
 
   const runFormat = (mode: JsonFormatInput["mode"]) => {
@@ -370,8 +409,8 @@ export const JsonFormatPanel = ({
       nextInput.escapeMode === "escape" ? "text" : current,
     );
 
-    if (shouldRun && nextInput.source.trim()) {
-      executeFormat(nextInput);
+    if (shouldRun) {
+      scheduleFormat(nextInput);
       return;
     }
 

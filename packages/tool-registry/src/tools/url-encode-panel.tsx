@@ -82,20 +82,25 @@ export const UrlEncodePanel = ({
   });
 
   const updateDraft = (value: Partial<UrlEncodeInput>) => {
-    setResult(null);
-    setFeedback(null);
-    setDraft((current) => ({ ...current, ...value }));
-  };
-
-  const runTransform = (mode: UrlEncodeInput["mode"]) => {
     const nextInput = {
       ...draft,
-      mode
+      ...value
     };
 
+    setResult(null);
+    setFeedback(null);
     setDraft(nextInput);
+    executeTransform(nextInput);
+  };
 
-    const nextResult = transformUrlEncoding(nextInput);
+  const executeTransform = (input: UrlEncodeInput) => {
+    if (input.source.length === 0) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    const nextResult = transformUrlEncoding(input);
 
     if (!nextResult.ok) {
       setResult(null);
@@ -111,6 +116,16 @@ export const UrlEncodePanel = ({
       locale === "zh-CN" ? "URL 处理完成" : "Done",
       nextResult.data.result,
     );
+  };
+
+  const runTransform = (mode: UrlEncodeInput["mode"]) => {
+    const nextInput = {
+      ...draft,
+      mode
+    };
+
+    setDraft(nextInput);
+    executeTransform(nextInput);
   };
 
   return (

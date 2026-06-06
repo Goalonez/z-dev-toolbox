@@ -26,3 +26,5 @@ CLAUDE.md
 .claude/
 .trellis/
 .history/
+.agents/
+.codex/

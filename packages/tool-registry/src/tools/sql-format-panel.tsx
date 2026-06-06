@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatSql,
@@ -24,6 +24,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:sql.format:draft:v1";
+const AUTO_RUN_DELAY_MS = 350;
 
 const keywordCaseOptions = ["preserve", "upper", "lower"] as const;
 const identifierCaseOptions = ["preserve", "upper", "lower"] as const;
@@ -176,6 +177,9 @@ export const SqlFormatPanel = ({
     defaultDraft,
   );
   const draft = useMemo(() => normalizeDraft(rawDraft), [rawDraft]);
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
   const [result, setResult] = useState<SqlFormatOutput | null>(null);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
@@ -185,22 +189,44 @@ export const SqlFormatPanel = ({
     notify,
   });
 
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
   const resetResult = () => {
     setResult(null);
     setFeedback(null);
   };
 
   const updateDraft = (value: Partial<SqlFormatInput>) => {
+    const nextInput = normalizeDraft({
+      ...draft,
+      ...value,
+    });
+
     resetResult();
-    setDraft((current) =>
-      normalizeDraft({
-        ...normalizeDraft(current),
-        ...value,
-      }),
-    );
+    setDraft(nextInput);
+    scheduleFormat(nextInput);
   };
 
   const executeFormat = (input: SqlFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
     const nextResult = formatSql(input);
 
     if (!nextResult.ok) {
@@ -214,6 +240,19 @@ export const SqlFormatPanel = ({
 
     setResult(nextResult.data);
     reportSuccess(text.successMessage[input.mode], nextResult.data.formatted);
+  };
+
+  const scheduleFormat = (input: SqlFormatInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      resetResult();
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      executeFormat(input);
+    }, AUTO_RUN_DELAY_MS);
   };
 
   const runFormat = (mode: SqlFormatInput["mode"]) => {

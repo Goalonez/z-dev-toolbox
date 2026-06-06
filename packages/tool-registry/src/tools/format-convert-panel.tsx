@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   convertDataFormat,
@@ -23,6 +23,7 @@ import type { ToolPanelProps } from "../types";
 import { commonPanelCopy, formatToolError } from "./panel-copy";
 
 const TOOL_DRAFT_KEY = "tool:format.convert:draft:v2";
+const AUTO_RUN_DELAY_MS = 300;
 
 const formatLabels: Record<DataFormat, Record<Locale, string>> = {
   json: {
@@ -135,6 +136,9 @@ export const FormatConvertPanel = ({
     defaultDraft,
   );
   const [result, setResult] = useState<FormatConvertOutput | null>(null);
+  const autoRunTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
+    null,
+  );
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
     bridge,
@@ -143,14 +147,42 @@ export const FormatConvertPanel = ({
     notify
   });
 
-  const updateDraft = (value: Partial<FormatConvertInput>) => {
-    setResult(null);
-    setFeedback(null);
-    setDraft((current) => ({ ...current, ...value }));
+  const clearAutoRunTimeout = () => {
+    if (autoRunTimeoutRef.current) {
+      window.clearTimeout(autoRunTimeoutRef.current);
+      autoRunTimeoutRef.current = null;
+    }
   };
 
-  const runConvert = () => {
-    const nextResult = convertDataFormat(draft);
+  useEffect(
+    () => () => {
+      clearAutoRunTimeout();
+    },
+    [],
+  );
+
+  const updateDraft = (value: Partial<FormatConvertInput>) => {
+    const nextInput = {
+      ...draft,
+      ...value
+    };
+
+    setResult(null);
+    setFeedback(null);
+    setDraft(nextInput);
+    scheduleConvert(nextInput);
+  };
+
+  const executeConvert = (input: FormatConvertInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    const nextResult = convertDataFormat(input);
 
     if (!nextResult.ok) {
       setResult(null);
@@ -163,6 +195,20 @@ export const FormatConvertPanel = ({
 
     setResult(nextResult.data);
     reportSuccess(text.successMessage, nextResult.data.result);
+  };
+
+  const scheduleConvert = (input: FormatConvertInput) => {
+    clearAutoRunTimeout();
+
+    if (!input.source.trim()) {
+      setResult(null);
+      setFeedback(null);
+      return;
+    }
+
+    autoRunTimeoutRef.current = window.setTimeout(() => {
+      executeConvert(input);
+    }, AUTO_RUN_DELAY_MS);
   };
 
   return (
@@ -238,7 +284,9 @@ export const FormatConvertPanel = ({
             <Button
               data-tool-primary-action="true"
               size="sm"
-              onClick={runConvert}
+              onClick={() => {
+                executeConvert(draft);
+              }}
             >
               {text.runAction}
             </Button>
