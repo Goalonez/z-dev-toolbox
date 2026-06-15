@@ -75,14 +75,7 @@ If you want a fixed image tag, replace `latest` with a concrete release such as 
 
 ### Browser Extension
 
-Release builds are published on [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases).
-
-If you download the extension zip from a release:
-
-1. Unzip it.
-2. Open `chrome://extensions` or `edge://extensions`.
-3. Enable Developer Mode.
-4. Click "Load unpacked" and select the extracted folder.
+The browser extension is available on the [Chrome Web Store](https://chromewebstore.google.com/detail/z-dev-toolbox/pbilldenadmdoiccepjobgopdlefpnoc). Install it directly from the store.
 
 ### Desktop
 

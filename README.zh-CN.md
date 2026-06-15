@@ -75,14 +75,7 @@ docker run -d \
 
 ### 浏览器插件
 
-插件正式产物发布在 [GitHub Releases](https://github.com/Goalonez/z-dev-toolbox/releases)。
-
-下载 release 里的插件 zip 后：
-
-1. 先解压。
-2. 打开 `chrome://extensions` 或 `edge://extensions`。
-3. 开启开发者模式。
-4. 选择“加载已解压的扩展程序”，然后选中解压后的目录。
+浏览器插件已上架 [Chrome 网上应用店](https://chromewebstore.google.com/detail/z-dev-toolbox/pbilldenadmdoiccepjobgopdlefpnoc)，直接从商店安装即可。
 
 ### 桌面端
 
