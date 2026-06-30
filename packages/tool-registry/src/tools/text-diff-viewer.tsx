@@ -3,6 +3,7 @@ import {
   useLayoutEffect,
   useRef,
   type ClipboardEvent,
+  type CSSProperties,
   type RefObject
 } from "react";
 
@@ -292,6 +293,36 @@ const createEmptyRow = (): TextDiffRow => ({
 const isDesktopViewport = () =>
   typeof window !== "undefined" && window.innerWidth >= 1024;
 
+const getCharacterColumnCount = (character: string) => {
+  if (character === "\t") {
+    return 4;
+  }
+
+  return (character.codePointAt(0) ?? 0) > 0xff ? 2 : 1;
+};
+
+const getLineColumnCount = (value: string) =>
+  Array.from(value).reduce(
+    (columnCount, character) =>
+      columnCount + getCharacterColumnCount(character),
+    0
+  );
+
+const getPaneMinWidthStyle = (
+  rows: TextDiffRow[],
+  side: DiffViewerSide
+): CSSProperties => {
+  const longestLineColumnCount = rows.reduce(
+    (longest, row) =>
+      Math.max(longest, getLineColumnCount(getLineText(row, side))),
+    1
+  );
+
+  return {
+    minWidth: `max(100%, calc(56px + ${longestLineColumnCount + 1}ch + 1.5rem))`
+  };
+};
+
 const PreviewLine = ({ spans }: { spans: TextDiffInlineSpan[] }) => {
   if (!spans.length) {
     return <span className="opacity-0"> </span>;
@@ -405,7 +436,8 @@ export const TextDiffViewer = ({
 
   const syncScroll = (
     target: HTMLDivElement | null,
-    nextTop: number
+    nextTop: number,
+    nextLeft: number
   ) => {
     if (!target || !isDesktopViewport()) {
       return;
@@ -417,6 +449,7 @@ export const TextDiffViewer = ({
 
     syncingScrollRef.current = true;
     target.scrollTop = nextTop;
+    target.scrollLeft = nextLeft;
 
     window.requestAnimationFrame(() => {
       syncingScrollRef.current = false;
@@ -453,191 +486,200 @@ export const TextDiffViewer = ({
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin]"
         onScroll={(event) => {
-          syncScroll(oppositeScrollRef.current, event.currentTarget.scrollTop);
+          syncScroll(
+            oppositeScrollRef.current,
+            event.currentTarget.scrollTop,
+            event.currentTarget.scrollLeft
+          );
         }}
       >
-        {displayRows.map((row, rowIndex) => {
-          const lineValue = getLineText(row, side);
-          const lineNumber = getLineNumber(row, side);
-          const spans = getInlineSpans(row, side, highlightMode);
-          const isActive =
-            activeDiffRange !== null &&
-            activeDiffRange !== undefined &&
-            rowIndex >= activeDiffRange.start &&
-            rowIndex <= activeDiffRange.end;
+        <div
+          className="min-w-full"
+          style={getPaneMinWidthStyle(displayRows, side)}
+        >
+          {displayRows.map((row, rowIndex) => {
+            const lineValue = getLineText(row, side);
+            const lineNumber = getLineNumber(row, side);
+            const spans = getInlineSpans(row, side, highlightMode);
+            const isActive =
+              activeDiffRange !== null &&
+              activeDiffRange !== undefined &&
+              rowIndex >= activeDiffRange.start &&
+              rowIndex <= activeDiffRange.end;
 
-          return (
-            <div
-              key={`${side}-${rowIndex}`}
-              ref={(node) => {
-                if (side !== "left") {
-                  return;
-                }
-
-                if (node) {
-                  rowRefs.current.set(rowIndex, node);
-                  return;
-                }
-
-                rowRefs.current.delete(rowIndex);
-              }}
-              className={cn(
-                "relative overflow-hidden grid grid-cols-[56px_minmax(0,1fr)] border-b border-[rgb(var(--color-border)/0.12)] last:border-b-0",
-                lineToneClassName(row, side, highlightMode),
-                isActive &&
-                  "before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-1 before:bg-[rgb(var(--color-accent))] before:content-[''] shadow-[inset_0_0_0_2px_rgb(var(--color-accent)/0.36)]"
-              )}
-            >
+            return (
               <div
+                key={`${side}-${rowIndex}`}
+                ref={(node) => {
+                  if (side !== "left") {
+                    return;
+                  }
+
+                  if (node) {
+                    rowRefs.current.set(rowIndex, node);
+                    return;
+                  }
+
+                  rowRefs.current.delete(rowIndex);
+                }}
                 className={cn(
-                  "select-none border-r border-[rgb(var(--color-border)/0.12)] bg-[rgb(var(--color-surface-muted)/0.22)] px-2 py-1 text-right font-mono text-[11px] leading-6 text-muted",
+                  "relative grid grid-cols-[56px_minmax(0,1fr)] overflow-hidden border-b border-[rgb(var(--color-border)/0.12)] last:border-b-0",
+                  lineToneClassName(row, side, highlightMode),
                   isActive &&
-                    "bg-[rgb(var(--color-accent)/0.14)] font-semibold text-foreground"
+                    "before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-1 before:bg-[rgb(var(--color-accent))] before:content-[''] shadow-[inset_0_0_0_2px_rgb(var(--color-accent)/0.36)]"
                 )}
               >
-                {lineNumber ?? ""}
-              </div>
-              <div className="relative min-w-0">
-                <div className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-1 font-mono text-[12px] leading-6">
-                  <div
+                <div
+                  className={cn(
+                    "select-none border-r border-[rgb(var(--color-border)/0.12)] bg-[rgb(var(--color-surface-muted)/0.22)] px-2 py-1 text-right font-mono text-[11px] leading-6 text-muted",
+                    isActive &&
+                      "bg-[rgb(var(--color-accent)/0.14)] font-semibold text-foreground"
+                  )}
+                >
+                  {lineNumber ?? ""}
+                </div>
+                <div className="relative min-w-0">
+                  <div className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-1 font-mono text-[12px] leading-6">
+                    <div
+                      ref={(node) => {
+                        const key = `${side}:${rowIndex}`;
+
+                        if (node) {
+                          previewRefs.current.set(key, node);
+                          return;
+                        }
+
+                        previewRefs.current.delete(key);
+                      }}
+                      className="min-w-max whitespace-pre"
+                    >
+                      <PreviewLine spans={spans} />
+                    </div>
+                  </div>
+                  <textarea
                     ref={(node) => {
                       const key = `${side}:${rowIndex}`;
 
                       if (node) {
-                        previewRefs.current.set(key, node);
+                        inputRefs.current.set(key, node);
                         return;
                       }
 
-                      previewRefs.current.delete(key);
+                      inputRefs.current.delete(key);
                     }}
-                    className="min-w-max whitespace-pre"
-                  >
-                    <PreviewLine spans={spans} />
-                  </div>
-                </div>
-                <textarea
-                  ref={(node) => {
-                    const key = `${side}:${rowIndex}`;
+                    rows={1}
+                    spellCheck={false}
+                    value={lineValue}
+                    wrap="off"
+                    className="relative z-10 h-8 w-full resize-none overflow-x-auto overflow-y-hidden whitespace-pre bg-transparent px-3 py-1 font-mono text-[12px] leading-6 text-transparent caret-[rgb(var(--color-foreground))] outline-none selection:bg-[rgb(var(--color-accent)/0.18)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    onScroll={(event) => {
+                      const previewNode = previewRefs.current.get(
+                        `${side}:${rowIndex}`
+                      );
 
-                    if (node) {
-                      inputRefs.current.set(key, node);
-                      return;
-                    }
+                      if (!previewNode) {
+                        return;
+                      }
 
-                    inputRefs.current.delete(key);
-                  }}
-                  rows={1}
-                  spellCheck={false}
-                  value={lineValue}
-                  wrap="off"
-                  className="relative z-10 h-8 w-full resize-none overflow-x-auto overflow-y-hidden whitespace-pre bg-transparent px-3 py-1 font-mono text-[12px] leading-6 text-transparent caret-[rgb(var(--color-foreground))] outline-none selection:bg-[rgb(var(--color-accent)/0.18)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  onScroll={(event) => {
-                    const previewNode = previewRefs.current.get(
-                      `${side}:${rowIndex}`
-                    );
+                      previewNode.style.transform = `translateX(-${event.currentTarget.scrollLeft}px)`;
+                    }}
+                    onChange={(event) => {
+                      onChange(
+                        replaceVisualRow(
+                          value,
+                          displayRows,
+                          side,
+                          rowIndex,
+                          event.currentTarget.value.replace(/\r/g, "")
+                        )
+                      );
+                    }}
+                    onKeyDown={(event) => {
+                      const isSelectAllShortcut =
+                        (event.metaKey || event.ctrlKey) &&
+                        !event.altKey &&
+                        !event.shiftKey &&
+                        event.key.toLowerCase() === "a";
 
-                    if (!previewNode) {
-                      return;
-                    }
+                      if (isSelectAllShortcut) {
+                        event.preventDefault();
+                        selectAllSideText(side, value);
+                        return;
+                      }
 
-                    previewNode.style.transform = `translateX(-${event.currentTarget.scrollLeft}px)`;
-                  }}
-                  onChange={(event) => {
-                    onChange(
-                      replaceVisualRow(
-                        value,
-                        displayRows,
-                        side,
-                        rowIndex,
-                        event.currentTarget.value.replace(/\r/g, "")
-                      )
-                    );
-                  }}
-                  onKeyDown={(event) => {
-                    const isSelectAllShortcut =
-                      (event.metaKey || event.ctrlKey) &&
-                      !event.altKey &&
-                      !event.shiftKey &&
-                      event.key.toLowerCase() === "a";
+                      const selectionStart = event.currentTarget.selectionStart ?? 0;
+                      const selectionEnd = event.currentTarget.selectionEnd ?? 0;
 
-                    if (isSelectAllShortcut) {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+
+                        const nextMutation = splitVisualRow(
+                          value,
+                          displayRows,
+                          side,
+                          rowIndex,
+                          lineValue,
+                          selectionStart,
+                          selectionEnd
+                        );
+
+                        pendingFocusRef.current = nextMutation.focus ?? null;
+                        onChange(nextMutation.value);
+                        return;
+                      }
+
+                      if (
+                        (event.key === "Backspace" || event.key === "Delete") &&
+                        !lineValue.length &&
+                        selectionStart === 0 &&
+                        selectionEnd === 0
+                      ) {
+                        const nextMutation = removeVisualRow(
+                          value,
+                          displayRows,
+                          side,
+                          rowIndex,
+                          event.key
+                        );
+
+                        if (!nextMutation) {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        pendingFocusRef.current = nextMutation.focus ?? null;
+                        onChange(nextMutation.value);
+                      }
+                    }}
+                    onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
+                      const pastedText = event.clipboardData.getData("text");
+
+                      if (!pastedText.includes("\n") && !pastedText.includes("\r")) {
+                        return;
+                      }
+
                       event.preventDefault();
-                      selectAllSideText(side, value);
-                      return;
-                    }
 
-                    const selectionStart = event.currentTarget.selectionStart ?? 0;
-                    const selectionEnd = event.currentTarget.selectionEnd ?? 0;
-
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-
-                      const nextMutation = splitVisualRow(
+                      const nextMutation = pasteIntoVisualRow(
                         value,
                         displayRows,
                         side,
                         rowIndex,
                         lineValue,
-                        selectionStart,
-                        selectionEnd
+                        event.currentTarget.selectionStart ?? 0,
+                        event.currentTarget.selectionEnd ?? 0,
+                        pastedText
                       );
 
                       pendingFocusRef.current = nextMutation.focus ?? null;
                       onChange(nextMutation.value);
-                      return;
-                    }
-
-                    if (
-                      (event.key === "Backspace" || event.key === "Delete") &&
-                      !lineValue.length &&
-                      selectionStart === 0 &&
-                      selectionEnd === 0
-                    ) {
-                      const nextMutation = removeVisualRow(
-                        value,
-                        displayRows,
-                        side,
-                        rowIndex,
-                        event.key
-                      );
-
-                      if (!nextMutation) {
-                        return;
-                      }
-
-                      event.preventDefault();
-                      pendingFocusRef.current = nextMutation.focus ?? null;
-                      onChange(nextMutation.value);
-                    }
-                  }}
-                  onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
-                    const pastedText = event.clipboardData.getData("text");
-
-                    if (!pastedText.includes("\n") && !pastedText.includes("\r")) {
-                      return;
-                    }
-
-                    event.preventDefault();
-
-                    const nextMutation = pasteIntoVisualRow(
-                      value,
-                      displayRows,
-                      side,
-                      rowIndex,
-                      lineValue,
-                      event.currentTarget.selectionStart ?? 0,
-                      event.currentTarget.selectionEnd ?? 0,
-                      pastedText
-                    );
-
-                    pendingFocusRef.current = nextMutation.focus ?? null;
-                    onChange(nextMutation.value);
-                  }}
-                />
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
       <textarea
         ref={(node) => {
