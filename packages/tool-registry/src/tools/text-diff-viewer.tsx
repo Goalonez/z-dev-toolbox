@@ -1,702 +1,434 @@
+import { Fragment, useId, useLayoutEffect, useRef, useState } from "react";
 import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type ClipboardEvent,
-  type CSSProperties,
-  type RefObject
-} from "react";
-
-import type {
-  DiffKind,
-  TextDiffHighlightMode,
-  TextDiffInlineSpan,
-  TextDiffRow
-} from "@z-dev-toolbox/core";
-import { cn } from "@z-dev-toolbox/ui";
+  Compartment,
+  EditorState,
+  StateEffect,
+  StateField,
+  Transaction,
+} from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  Decoration,
+  EditorView,
+  drawSelection,
+  keymap,
+  lineNumbers,
+  type DecorationSet,
+} from "@codemirror/view";
+import type { TextDiffHighlightMode, TextDiffRow } from "@z-dev-toolbox/core";
 
 import { toolInsetPanelClassName } from "../components/tool-panel-kit";
-
-type DiffViewerSide = "left" | "right";
-
-interface DiffRange {
-  start: number;
-  end: number;
-}
+import {
+  buildDiffDecorations,
+  getDiffLineBounds,
+  getDiffLineRange,
+  DIFF_ROW_HEIGHT,
+  type DiffRange,
+  type DiffViewerSide,
+} from "./text-diff-decorations";
 
 interface TextDiffViewerProps {
   highlightMode: TextDiffHighlightMode;
   rows: TextDiffRow[];
+  diffRanges: DiffRange[];
   before: string;
   after: string;
   beforeLabel: string;
   afterLabel: string;
   errorText?: string | null;
   activeDiffRange?: DiffRange | null;
+  navigationRequest: number;
   onBeforeChange: (value: string) => void;
   onAfterChange: (value: string) => void;
 }
 
-interface FocusTarget {
-  side: DiffViewerSide;
-  rowIndex: number;
-  selectionStart: number;
-  selectionEnd: number;
+interface DiffConnector {
+  range: DiffRange;
+  left: DiffRange;
+  right: DiffRange;
+  leftBounds: DiffRange;
+  rightBounds: DiffRange;
 }
 
-interface LineMutationResult {
-  value: string;
-  focus?: FocusTarget;
-}
-
-const splitEditorLines = (value: string) =>
-  value.length > 0 ? value.split("\n") : [];
-
-const joinEditorLines = (lines: string[]) => lines.join("\n");
-
-const getLineNumber = (row: TextDiffRow, side: DiffViewerSide) =>
-  side === "left" ? row.leftLineNumber : row.rightLineNumber;
-
-const getLineText = (row: TextDiffRow, side: DiffViewerSide) =>
-  side === "left" ? row.leftText : row.rightText;
-
-const getInlineSpans = (
-  row: TextDiffRow,
-  side: DiffViewerSide,
-  highlightMode: TextDiffHighlightMode
-) => {
-  if (
-    row.kind === "changed" &&
-    (highlightMode === "word" ||
-      highlightMode === "split" ||
-      highlightMode === "character")
-  ) {
-    return side === "left" ? row.leftSpans ?? [] : row.rightSpans ?? [];
-  }
-
-  const value = getLineText(row, side);
-
-  return value.length > 0 ? [{ kind: "equal" as const, value }] : [];
-};
-
-const resolveInsertIndex = (
-  rows: TextDiffRow[],
-  side: DiffViewerSide,
-  rowIndex: number
-) => {
-  const currentLineNumber = getLineNumber(rows[rowIndex] ?? createEmptyRow(), side);
-
-  if (typeof currentLineNumber === "number") {
-    return currentLineNumber - 1;
-  }
-
-  for (let index = rowIndex - 1; index >= 0; index -= 1) {
-    const previousLineNumber = getLineNumber(rows[index] ?? createEmptyRow(), side);
-
-    if (typeof previousLineNumber === "number") {
-      return previousLineNumber;
+const setDiffDecorations = StateEffect.define<DecorationSet>();
+const diffDecorations = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update: (decorations, transaction) => {
+    for (const effect of transaction.effects) {
+      if (effect.is(setDiffDecorations)) return effect.value;
     }
-  }
-
-  return 0;
-};
-
-const replaceVisualRow = (
-  source: string,
-  rows: TextDiffRow[],
-  side: DiffViewerSide,
-  rowIndex: number,
-  nextLine: string
-) => {
-  const lines = splitEditorLines(source);
-  const lineNumber = getLineNumber(rows[rowIndex] ?? createEmptyRow(), side);
-
-  if (typeof lineNumber === "number") {
-    const nextLines = [...lines];
-    nextLines[lineNumber - 1] = nextLine;
-    return joinEditorLines(nextLines);
-  }
-
-  if (!nextLine.length) {
-    return source;
-  }
-
-  const nextLines = [...lines];
-  nextLines.splice(resolveInsertIndex(rows, side, rowIndex), 0, nextLine);
-  return joinEditorLines(nextLines);
-};
-
-const splitVisualRow = (
-  source: string,
-  rows: TextDiffRow[],
-  side: DiffViewerSide,
-  rowIndex: number,
-  currentValue: string,
-  selectionStart: number,
-  selectionEnd: number
-): LineMutationResult => {
-  const lines = splitEditorLines(source);
-  const lineNumber = getLineNumber(rows[rowIndex] ?? createEmptyRow(), side);
-  const insertIndex = resolveInsertIndex(rows, side, rowIndex);
-  const nextLines = [...lines];
-  const beforePart = currentValue.slice(0, selectionStart);
-  const afterPart = currentValue.slice(selectionEnd);
-  const replacement = [beforePart, afterPart];
-
-  if (typeof lineNumber === "number") {
-    nextLines.splice(lineNumber - 1, 1, ...replacement);
-  } else if (beforePart.length || afterPart.length) {
-    nextLines.splice(insertIndex, 0, ...replacement);
-  } else {
-    nextLines.splice(insertIndex, 0, "");
-  }
-
-  return {
-    value: joinEditorLines(nextLines),
-    focus: {
-      side,
-      rowIndex: rowIndex + 1,
-      selectionStart: 0,
-      selectionEnd: 0
-    }
-  };
-};
-
-const pasteIntoVisualRow = (
-  source: string,
-  rows: TextDiffRow[],
-  side: DiffViewerSide,
-  rowIndex: number,
-  currentValue: string,
-  selectionStart: number,
-  selectionEnd: number,
-  pastedText: string
-): LineMutationResult => {
-  const normalizedText = pastedText.replace(/\r\n?/g, "\n");
-  const segments = normalizedText.split("\n");
-
-  if (segments.length === 1) {
-    return {
-      value: replaceVisualRow(
-        source,
-        rows,
-        side,
-        rowIndex,
-        `${currentValue.slice(0, selectionStart)}${normalizedText}${currentValue.slice(selectionEnd)}`
-      )
-    };
-  }
-
-  const lines = splitEditorLines(source);
-  const lineNumber = getLineNumber(rows[rowIndex] ?? createEmptyRow(), side);
-  const insertIndex = resolveInsertIndex(rows, side, rowIndex);
-  const nextLines = [...lines];
-  const mergedSegments = [
-    `${currentValue.slice(0, selectionStart)}${segments[0] ?? ""}`,
-    ...segments.slice(1, -1),
-    `${segments.at(-1) ?? ""}${currentValue.slice(selectionEnd)}`
-  ];
-
-  if (typeof lineNumber === "number") {
-    nextLines.splice(lineNumber - 1, 1, ...mergedSegments);
-  } else {
-    nextLines.splice(insertIndex, 0, ...mergedSegments);
-  }
-
-  const lastSegment = mergedSegments.at(-1) ?? "";
-
-  return {
-    value: joinEditorLines(nextLines),
-    focus: {
-      side,
-      rowIndex: rowIndex + mergedSegments.length - 1,
-      selectionStart: lastSegment.length,
-      selectionEnd: lastSegment.length
-    }
-  };
-};
-
-const removeVisualRow = (
-  source: string,
-  rows: TextDiffRow[],
-  side: DiffViewerSide,
-  rowIndex: number,
-  key: "Backspace" | "Delete"
-): LineMutationResult | null => {
-  const lines = splitEditorLines(source);
-  const lineNumber = getLineNumber(rows[rowIndex] ?? createEmptyRow(), side);
-
-  if (typeof lineNumber !== "number") {
-    return null;
-  }
-
-  const nextLines = [...lines];
-  nextLines.splice(lineNumber - 1, 1);
-
-  return {
-    value: joinEditorLines(nextLines),
-    focus: {
-      side,
-      rowIndex: key === "Backspace" ? Math.max(rowIndex - 1, 0) : rowIndex,
-      selectionStart: 0,
-      selectionEnd: 0
-    }
-  };
-};
-
-const lineToneClassName = (
-  row: TextDiffRow,
-  side: DiffViewerSide,
-  highlightMode: TextDiffHighlightMode
-) => {
-  if (highlightMode === "none") {
-    return "bg-transparent";
-  }
-
-  if (row.kind === "changed") {
-    return side === "left" ? "bg-danger/10" : "bg-success/10";
-  }
-
-  if (row.kind === "removed") {
-    return side === "left"
-      ? "bg-danger/10"
-      : "bg-[rgb(var(--color-surface-muted)/0.18)]";
-  }
-
-  if (row.kind === "added") {
-    return side === "right"
-      ? "bg-success/10"
-      : "bg-[rgb(var(--color-surface-muted)/0.18)]";
-  }
-
-  return "bg-transparent";
-};
-
-const inlineSpanClassName = (kind: DiffKind) => {
-  if (kind === "equal") {
-    return "text-foreground";
-  }
-
-  return kind === "removed"
-    ? "rounded-sm bg-danger/18 px-0.5 text-danger"
-    : "rounded-sm bg-success/18 px-0.5 text-success";
-};
-
-const createEmptyRow = (): TextDiffRow => ({
-  kind: "equal",
-  leftLineNumber: null,
-  rightLineNumber: null,
-  leftText: "",
-  rightText: ""
+    return decorations.map(transaction.changes);
+  },
+  provide: (field) => EditorView.decorations.from(field),
 });
 
-const isDesktopViewport = () =>
-  typeof window !== "undefined" && window.innerWidth >= 1024;
+const editorTheme = EditorView.theme({
+  "&": {
+    height: "100%",
+    color: "rgb(var(--color-foreground))",
+    fontSize: "12px",
+  },
+  "&.cm-focused": { outline: "none" },
+  ".cm-scroller": {
+    overflow: "auto",
+    fontFamily:
+      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    lineHeight: "24px",
+    scrollbarWidth: "thin",
+  },
+  ".cm-content": {
+    padding: "0",
+    minHeight: "100%",
+    caretColor: "rgb(var(--color-foreground))",
+  },
+  ".cm-line": {
+    boxSizing: "border-box",
+    height: `${DIFF_ROW_HEIGHT}px`,
+    boxShadow: "inset 0 -1px rgb(var(--color-border) / 0.12)",
+    padding: "4px 12px",
+    lineHeight: "24px",
+  },
+  ".cm-gutters": {
+    backgroundColor: "rgb(var(--color-surface-muted) / 0.22)",
+    color: "rgb(var(--color-muted))",
+    borderRight: "1px solid rgb(var(--color-border) / 0.12)",
+  },
+  ".cm-lineNumbers": { minWidth: "55px" },
+  ".cm-lineNumbers .cm-gutterElement": {
+    padding: "0 8px",
+    fontSize: "11px",
+    lineHeight: `${DIFF_ROW_HEIGHT}px`,
+  },
+  ".cm-diff-removed": { backgroundColor: "rgb(var(--color-danger) / 0.1)" },
+  ".cm-diff-added": { backgroundColor: "rgb(var(--color-success) / 0.1)" },
+  ".cm-diff-active": {
+    boxShadow:
+      "inset 3px 0 rgb(var(--color-accent)), inset 0 -1px rgb(var(--color-border) / 0.12)",
+  },
+  ".cm-diff-inline-removed": {
+    borderRadius: "2px",
+    backgroundColor: "rgb(var(--color-danger) / 0.18)",
+    color: "rgb(var(--color-danger))",
+  },
+  ".cm-diff-inline-added": {
+    borderRadius: "2px",
+    backgroundColor: "rgb(var(--color-success) / 0.18)",
+    color: "rgb(var(--color-success))",
+  },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+    { backgroundColor: "rgb(var(--color-accent) / 0.22)" },
+  ".cm-cursor": { borderLeftColor: "rgb(var(--color-foreground))" },
+});
 
-const getCharacterColumnCount = (character: string) => {
-  if (character === "\t") {
-    return 4;
-  }
-
-  return (character.codePointAt(0) ?? 0) > 0xff ? 2 : 1;
-};
-
-const getLineColumnCount = (value: string) =>
-  Array.from(value).reduce(
-    (columnCount, character) =>
-      columnCount + getCharacterColumnCount(character),
-    0
-  );
-
-const getPaneMinWidthStyle = (
-  rows: TextDiffRow[],
-  side: DiffViewerSide
-): CSSProperties => {
-  const longestLineColumnCount = rows.reduce(
-    (longest, row) =>
-      Math.max(longest, getLineColumnCount(getLineText(row, side))),
-    1
-  );
-
-  return {
-    minWidth: `max(100%, calc(56px + ${longestLineColumnCount + 1}ch + 1.5rem))`
-  };
-};
-
-const PreviewLine = ({ spans }: { spans: TextDiffInlineSpan[] }) => {
-  if (!spans.length) {
-    return <span className="opacity-0"> </span>;
-  }
-
-  return (
-    <>
-      {spans.map((span, index) => (
-        <span
-          key={`${span.kind}-${index}`}
-          className={inlineSpanClassName(span.kind)}
-        >
-          {span.value}
-        </span>
-      ))}
-    </>
-  );
-};
-
-const PaneHeader = ({ title }: { title: string }) => (
-  <div className="border-b border-[rgb(var(--color-border)/0.14)] px-3 py-2">
-    <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted">
-      {title}
-    </div>
-  </div>
-);
-
-export const TextDiffViewer = ({
-  highlightMode,
-  rows,
-  before,
-  after,
-  beforeLabel,
-  afterLabel,
-  errorText,
-  activeDiffRange,
-  onBeforeChange,
-  onAfterChange
-}: TextDiffViewerProps) => {
-  const displayRows = rows.length > 0 ? rows : [createEmptyRow()];
-  const leftScrollRef = useRef<HTMLDivElement | null>(null);
-  const rightScrollRef = useRef<HTMLDivElement | null>(null);
-  const syncingScrollRef = useRef(false);
-  const pendingFocusRef = useRef<FocusTarget | null>(null);
-  const inputRefs = useRef(new Map<string, HTMLTextAreaElement>());
-  const previewRefs = useRef(new Map<string, HTMLDivElement>());
-  const rowRefs = useRef(new Map<number, HTMLDivElement>());
-  const selectionTextareaRefs = useRef(
-    new Map<DiffViewerSide, HTMLTextAreaElement>()
-  );
-
-  useEffect(() => {
-    const pendingFocus = pendingFocusRef.current;
-
-    if (!pendingFocus) {
-      return;
-    }
-
-    const nextInput = inputRefs.current.get(
-      `${pendingFocus.side}:${pendingFocus.rowIndex}`
-    );
-
-    if (!nextInput) {
-      pendingFocusRef.current = null;
-      return;
-    }
-
-    nextInput.focus();
-    nextInput.setSelectionRange(
-      pendingFocus.selectionStart,
-      pendingFocus.selectionEnd
-    );
-    pendingFocusRef.current = null;
-  }, [before, after, displayRows.length]);
+export const TextDiffViewer = (props: TextDiffViewerProps) => {
+  const {
+    before,
+    after,
+    rows,
+    highlightMode,
+    activeDiffRange,
+    navigationRequest,
+    beforeLabel,
+    afterLabel,
+    errorText,
+  } = props;
+  const leftHostRef = useRef<HTMLDivElement>(null);
+  const rightHostRef = useRef<HTMLDivElement>(null);
+  const connectorHostRef = useRef<HTMLDivElement>(null);
+  const [{ connectors, clip }, setConnectorLayout] = useState<{
+    connectors: DiffConnector[];
+    clip: DiffRange;
+  }>({ connectors: [], clip: { start: 0, end: 0 } });
+  const connectorGradientId = useId();
+  const connectorClipId = `${connectorGradientId}-clip`;
+  const measureConnectorsRef = useRef<() => void>(() => {});
+  const editorsRef = useRef<
+    Partial<
+      Record<
+        DiffViewerSide,
+        {
+          view: EditorView;
+          label: string;
+          attributes: Compartment;
+          decoratedDoc: EditorState["doc"];
+        }
+      >
+    >
+  >({});
+  const propsRef = useRef(props);
+  const syncFrameRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
-    if (!activeDiffRange) {
-      return;
+    propsRef.current = props;
+  });
+
+  useLayoutEffect(() => {
+    const mountEditor = (side: DiffViewerSide, parent: HTMLDivElement) => {
+      const initial = propsRef.current;
+      const label = side === "left" ? initial.beforeLabel : initial.afterLabel;
+      const source = side === "left" ? initial.before : initial.after;
+      const attributes = new Compartment();
+      const view = new EditorView({
+        parent,
+        state: EditorState.create({
+          doc: source,
+          extensions: [
+            editorTheme,
+            diffDecorations,
+            lineNumbers(),
+            drawSelection(),
+            history(),
+            keymap.of([
+              // The app shell handles Shift+Enter to return to tool search.
+              { key: "Shift-Enter", run: () => true },
+              ...defaultKeymap,
+              ...historyKeymap,
+            ]),
+            attributes.of(
+              EditorView.contentAttributes.of({
+                "aria-label": label,
+                spellcheck: "false",
+              }),
+            ),
+            EditorView.updateListener.of((update) => {
+              if (
+                update.docChanged ||
+                update.geometryChanged ||
+                update.viewportChanged
+              )
+                measureConnectorsRef.current();
+              if (!update.docChanged) return;
+              const onChange =
+                side === "left"
+                  ? propsRef.current.onBeforeChange
+                  : propsRef.current.onAfterChange;
+              onChange(update.state.doc.toString());
+            }),
+            EditorView.domEventHandlers({
+              scroll: (event, currentView) => {
+                if (event.target === currentView.scrollDOM)
+                  measureConnectorsRef.current();
+                if (
+                  event.target !== currentView.scrollDOM ||
+                  window.innerWidth < 1024 ||
+                  syncFrameRef.current !== null
+                )
+                  return;
+                const opposite =
+                  editorsRef.current[side === "left" ? "right" : "left"]?.view
+                    .scrollDOM;
+                if (!opposite) return;
+                opposite.scrollTop = currentView.scrollDOM.scrollTop;
+                opposite.scrollLeft = currentView.scrollDOM.scrollLeft;
+                syncFrameRef.current = window.requestAnimationFrame(() => {
+                  syncFrameRef.current = null;
+                });
+              },
+            }),
+          ],
+        }),
+      });
+      editorsRef.current[side] = {
+        view,
+        label,
+        attributes,
+        decoratedDoc: view.state.doc,
+      };
+      // Loading an older draft may normalize CRLF through the editor's text model.
+      if (view.state.doc.toString() !== source) {
+        (side === "left" ? initial.onBeforeChange : initial.onAfterChange)(
+          view.state.doc.toString(),
+        );
+      }
+    };
+    if (leftHostRef.current) mountEditor("left", leftHostRef.current);
+    if (rightHostRef.current) mountEditor("right", rightHostRef.current);
+    return () => {
+      for (const editor of Object.values(editorsRef.current))
+        editor.view.destroy();
+      editorsRef.current = {};
+      if (syncFrameRef.current !== null)
+        window.cancelAnimationFrame(syncFrameRef.current);
+      syncFrameRef.current = null;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const host = connectorHostRef.current;
+    if (!host) return;
+    const measure = () => {
+      const left = editorsRef.current.left?.view;
+      const right = editorsRef.current.right?.view;
+      if (!left || !right) return;
+      left.requestMeasure({
+        key: host,
+        read: () => {
+          const emptyLayout = { connectors: [], clip: { start: 0, end: 0 } };
+          if (!host.clientWidth) return emptyLayout;
+          // A document edit can precede React's matching decoration update.
+          if (
+            editorsRef.current.left?.decoratedDoc !== left.state.doc ||
+            editorsRef.current.right?.decoratedDoc !== right.state.doc
+          )
+            return emptyLayout;
+          const hostTop = host.getBoundingClientRect().top;
+          const leftViewport = left.scrollDOM.getBoundingClientRect();
+          const rightViewport = right.scrollDOM.getBoundingClientRect();
+          const clip = {
+            start: Math.max(leftViewport.top, rightViewport.top) - hostTop,
+            end:
+              Math.min(
+                leftViewport.top + left.scrollDOM.clientHeight,
+                rightViewport.top + right.scrollDOM.clientHeight,
+              ) - hostTop,
+          };
+          const current = propsRef.current;
+          const measureSide = (
+            view: EditorView,
+            bounds: DiffRange,
+          ): DiffRange => {
+            const origin = view.documentTop - hostTop;
+            if (bounds.start === bounds.end) {
+              const top =
+                origin +
+                (bounds.start === 0
+                  ? 0
+                  : view.lineBlockAt(view.state.doc.line(bounds.start).from)
+                      .bottom);
+              return { start: top, end: top };
+            }
+            return {
+              start:
+                origin +
+                view.lineBlockAt(view.state.doc.line(bounds.start + 1).from)
+                  .top,
+              end:
+                origin +
+                view.lineBlockAt(view.state.doc.line(bounds.end).from).bottom,
+            };
+          };
+          const connectors = current.diffRanges.flatMap((range) => {
+            const active = current.activeDiffRange?.start === range.start;
+            if (current.highlightMode === "none" && !active) return [];
+            const leftBounds = getDiffLineBounds(current.rows, "left", range);
+            const rightBounds = getDiffLineBounds(current.rows, "right", range);
+            const leftPosition = measureSide(left, leftBounds);
+            const rightPosition = measureSide(right, rightBounds);
+            if (
+              (leftPosition.end < clip.start &&
+                rightPosition.end < clip.start) ||
+              (leftPosition.start > clip.end && rightPosition.start > clip.end)
+            )
+              return [];
+            return [
+              {
+                range,
+                left: leftPosition,
+                right: rightPosition,
+                leftBounds,
+                rightBounds,
+              },
+            ];
+          });
+          return { connectors, clip };
+        },
+        write: setConnectorLayout,
+      });
+    };
+    measureConnectorsRef.current = measure;
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    if (leftHostRef.current) observer.observe(leftHostRef.current);
+    if (rightHostRef.current) observer.observe(rightHostRef.current);
+    measure();
+    return () => {
+      observer.disconnect();
+      measureConnectorsRef.current = () => {};
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    for (const side of ["left", "right"] as const) {
+      const editor = editorsRef.current[side];
+      if (!editor) continue;
+      const { view } = editor;
+      const value = (side === "left" ? before : after).replace(/\r\n?/g, "\n");
+      if (view.state.doc.toString() !== value) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: value },
+          annotations: Transaction.addToHistory.of(false),
+        });
+      }
+      const label = side === "left" ? beforeLabel : afterLabel;
+      const effects: StateEffect<unknown>[] = [
+        setDiffDecorations.of(
+          buildDiffDecorations(
+            view.state.doc,
+            rows,
+            side,
+            highlightMode,
+            activeDiffRange,
+          ),
+        ),
+      ];
+      if (editor.label !== label) {
+        effects.push(
+          editor.attributes.reconfigure(
+            EditorView.contentAttributes.of({
+              "aria-label": label,
+              spellcheck: "false",
+            }),
+          ),
+        );
+        editor.label = label;
+      }
+      view.dispatch({ effects });
+      editor.decoratedDoc = view.state.doc;
     }
+    measureConnectorsRef.current();
+  }, [
+    before,
+    after,
+    rows,
+    highlightMode,
+    activeDiffRange,
+    beforeLabel,
+    afterLabel,
+    props.diffRanges,
+  ]);
 
-    const scrollContainer = leftScrollRef.current;
-    const startRow = rowRefs.current.get(activeDiffRange.start);
-    const endRow = rowRefs.current.get(activeDiffRange.end);
-
-    if (!scrollContainer || !startRow || !endRow) {
-      return;
-    }
-
-    const containerHeight = scrollContainer.clientHeight;
-    const startTop = startRow.offsetTop;
-    const endBottom = endRow.offsetTop + endRow.offsetHeight;
-    const blockHeight = endBottom - startTop;
-    const blockPadding = 24;
-    const centeredTop =
-      startTop - Math.max((containerHeight - blockHeight) / 2, blockPadding);
-    const alignedTop = startTop - blockPadding;
-    const nextTop =
-      blockHeight + blockPadding * 2 <= containerHeight
-        ? centeredTop
-        : alignedTop;
-    const resolvedTop = Math.max(nextTop, 0);
-
-    syncingScrollRef.current = true;
-    leftScrollRef.current?.scrollTo({ top: resolvedTop });
-    rightScrollRef.current?.scrollTo({ top: resolvedTop });
-
-    window.requestAnimationFrame(() => {
-      syncingScrollRef.current = false;
-    });
-  }, [activeDiffRange]);
-
-  const syncScroll = (
-    target: HTMLDivElement | null,
-    nextTop: number,
-    nextLeft: number
-  ) => {
-    if (!target || !isDesktopViewport()) {
-      return;
-    }
-
-    if (syncingScrollRef.current) {
-      return;
-    }
-
-    syncingScrollRef.current = true;
-    target.scrollTop = nextTop;
-    target.scrollLeft = nextLeft;
-
-    window.requestAnimationFrame(() => {
-      syncingScrollRef.current = false;
-    });
-  };
-
-  const selectAllSideText = (side: DiffViewerSide, value: string) => {
-    const selectionTextarea = selectionTextareaRefs.current.get(side);
-
-    if (!selectionTextarea) {
-      return;
-    }
-
-    selectionTextarea.focus();
-    selectionTextarea.setSelectionRange(0, value.length);
-  };
-
-  const renderPane = (
-    side: DiffViewerSide,
-    title: string,
-    value: string,
-    onChange: (nextValue: string) => void,
-    scrollRef: RefObject<HTMLDivElement>,
-    oppositeScrollRef: RefObject<HTMLDivElement>
-  ) => (
-    <div
-      className={cn(
-        "flex min-h-[280px] min-w-0 flex-col overflow-hidden rounded-[24px] border",
-        toolInsetPanelClassName
-      )}
-    >
-      <PaneHeader title={title} />
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto [scrollbar-width:thin]"
-        onScroll={(event) => {
-          syncScroll(
-            oppositeScrollRef.current,
-            event.currentTarget.scrollTop,
-            event.currentTarget.scrollLeft
+  useLayoutEffect(() => {
+    if (!navigationRequest || !propsRef.current.activeDiffRange) return;
+    const range = propsRef.current.activeDiffRange;
+    for (const side of ["left", "right"] as const) {
+      const editor = editorsRef.current[side];
+      if (!editor) continue;
+      editor.view.requestMeasure({
+        read: (view) => {
+          const lines = getDiffLineRange(
+            propsRef.current.rows,
+            side,
+            range,
+            view.state.doc.lines,
           );
-        }}
-      >
-        <div
-          className="min-w-full"
-          style={getPaneMinWidthStyle(displayRows, side)}
-        >
-          {displayRows.map((row, rowIndex) => {
-            const lineValue = getLineText(row, side);
-            const lineNumber = getLineNumber(row, side);
-            const spans = getInlineSpans(row, side, highlightMode);
-            const isActive =
-              activeDiffRange !== null &&
-              activeDiffRange !== undefined &&
-              rowIndex >= activeDiffRange.start &&
-              rowIndex <= activeDiffRange.end;
-
-            return (
-              <div
-                key={`${side}-${rowIndex}`}
-                ref={(node) => {
-                  if (side !== "left") {
-                    return;
-                  }
-
-                  if (node) {
-                    rowRefs.current.set(rowIndex, node);
-                    return;
-                  }
-
-                  rowRefs.current.delete(rowIndex);
-                }}
-                className={cn(
-                  "relative grid grid-cols-[56px_minmax(0,1fr)] overflow-hidden border-b border-[rgb(var(--color-border)/0.12)] last:border-b-0",
-                  lineToneClassName(row, side, highlightMode),
-                  isActive &&
-                    "before:absolute before:inset-y-0 before:left-0 before:z-10 before:w-1 before:bg-[rgb(var(--color-accent))] before:content-[''] shadow-[inset_0_0_0_2px_rgb(var(--color-accent)/0.36)]"
-                )}
-              >
-                <div
-                  className={cn(
-                    "select-none border-r border-[rgb(var(--color-border)/0.12)] bg-[rgb(var(--color-surface-muted)/0.22)] px-2 py-1 text-right font-mono text-[11px] leading-6 text-muted",
-                    isActive &&
-                      "bg-[rgb(var(--color-accent)/0.14)] font-semibold text-foreground"
-                  )}
-                >
-                  {lineNumber ?? ""}
-                </div>
-                <div className="relative min-w-0">
-                  <div className="pointer-events-none absolute inset-0 overflow-hidden px-3 py-1 font-mono text-[12px] leading-6">
-                    <div
-                      ref={(node) => {
-                        const key = `${side}:${rowIndex}`;
-
-                        if (node) {
-                          previewRefs.current.set(key, node);
-                          return;
-                        }
-
-                        previewRefs.current.delete(key);
-                      }}
-                      className="min-w-max whitespace-pre"
-                    >
-                      <PreviewLine spans={spans} />
-                    </div>
-                  </div>
-                  <textarea
-                    ref={(node) => {
-                      const key = `${side}:${rowIndex}`;
-
-                      if (node) {
-                        inputRefs.current.set(key, node);
-                        return;
-                      }
-
-                      inputRefs.current.delete(key);
-                    }}
-                    rows={1}
-                    spellCheck={false}
-                    value={lineValue}
-                    wrap="off"
-                    className="relative z-10 h-8 w-full resize-none overflow-x-auto overflow-y-hidden whitespace-pre bg-transparent px-3 py-1 font-mono text-[12px] leading-6 text-transparent caret-[rgb(var(--color-foreground))] outline-none selection:bg-[rgb(var(--color-accent)/0.18)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    onScroll={(event) => {
-                      const previewNode = previewRefs.current.get(
-                        `${side}:${rowIndex}`
-                      );
-
-                      if (!previewNode) {
-                        return;
-                      }
-
-                      previewNode.style.transform = `translateX(-${event.currentTarget.scrollLeft}px)`;
-                    }}
-                    onChange={(event) => {
-                      onChange(
-                        replaceVisualRow(
-                          value,
-                          displayRows,
-                          side,
-                          rowIndex,
-                          event.currentTarget.value.replace(/\r/g, "")
-                        )
-                      );
-                    }}
-                    onKeyDown={(event) => {
-                      const isSelectAllShortcut =
-                        (event.metaKey || event.ctrlKey) &&
-                        !event.altKey &&
-                        !event.shiftKey &&
-                        event.key.toLowerCase() === "a";
-
-                      if (isSelectAllShortcut) {
-                        event.preventDefault();
-                        selectAllSideText(side, value);
-                        return;
-                      }
-
-                      const selectionStart = event.currentTarget.selectionStart ?? 0;
-                      const selectionEnd = event.currentTarget.selectionEnd ?? 0;
-
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-
-                        const nextMutation = splitVisualRow(
-                          value,
-                          displayRows,
-                          side,
-                          rowIndex,
-                          lineValue,
-                          selectionStart,
-                          selectionEnd
-                        );
-
-                        pendingFocusRef.current = nextMutation.focus ?? null;
-                        onChange(nextMutation.value);
-                        return;
-                      }
-
-                      if (
-                        (event.key === "Backspace" || event.key === "Delete") &&
-                        !lineValue.length &&
-                        selectionStart === 0 &&
-                        selectionEnd === 0
-                      ) {
-                        const nextMutation = removeVisualRow(
-                          value,
-                          displayRows,
-                          side,
-                          rowIndex,
-                          event.key
-                        );
-
-                        if (!nextMutation) {
-                          return;
-                        }
-
-                        event.preventDefault();
-                        pendingFocusRef.current = nextMutation.focus ?? null;
-                        onChange(nextMutation.value);
-                      }
-                    }}
-                    onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
-                      const pastedText = event.clipboardData.getData("text");
-
-                      if (!pastedText.includes("\n") && !pastedText.includes("\r")) {
-                        return;
-                      }
-
-                      event.preventDefault();
-
-                      const nextMutation = pasteIntoVisualRow(
-                        value,
-                        displayRows,
-                        side,
-                        rowIndex,
-                        lineValue,
-                        event.currentTarget.selectionStart ?? 0,
-                        event.currentTarget.selectionEnd ?? 0,
-                        pastedText
-                      );
-
-                      pendingFocusRef.current = nextMutation.focus ?? null;
-                      onChange(nextMutation.value);
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <textarea
-        ref={(node) => {
-          if (node) {
-            selectionTextareaRefs.current.set(side, node);
-            return;
-          }
-
-          selectionTextareaRefs.current.delete(side);
-        }}
-        readOnly
-        tabIndex={-1}
-        value={value}
-        className="absolute left-0 top-0 h-px w-px opacity-0 pointer-events-none"
-      />
-    </div>
-  );
+          const blockHeight = (lines.end - lines.start + 1) * DIFF_ROW_HEIGHT;
+          const padding =
+            blockHeight + 48 <= view.scrollDOM.clientHeight
+              ? Math.max((view.scrollDOM.clientHeight - blockHeight) / 2, 24)
+              : 24;
+          return Math.max((lines.start - 1) * DIFF_ROW_HEIGHT - padding, 0);
+        },
+        write: (top, view) => {
+          if (syncFrameRef.current !== null)
+            window.cancelAnimationFrame(syncFrameRef.current);
+          syncFrameRef.current = window.requestAnimationFrame(() => {
+            syncFrameRef.current = null;
+          });
+          view.scrollDOM.scrollTop = top;
+        },
+      });
+    }
+  }, [navigationRequest]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -705,23 +437,83 @@ export const TextDiffViewer = ({
           {errorText}
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        {renderPane(
-          "left",
-          beforeLabel,
-          before,
-          onBeforeChange,
-          leftScrollRef,
-          rightScrollRef
-        )}
-        {renderPane(
-          "right",
-          afterLabel,
-          after,
-          onAfterChange,
-          rightScrollRef,
-          leftScrollRef
-        )}
+      <div className="grid min-h-0 flex-1 gap-3 lg:gap-0 lg:grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)]">
+        {(["left", "right"] as const).map((side) => (
+          <Fragment key={side}>
+            <div
+              className={`flex min-h-[280px] min-w-0 flex-col overflow-hidden rounded-[24px] border ${toolInsetPanelClassName}`}
+            >
+              <div className="border-b border-[rgb(var(--color-border)/0.14)] px-3 py-2">
+                <div className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-muted">
+                  {side === "left" ? beforeLabel : afterLabel}
+                </div>
+              </div>
+              <div
+                ref={side === "left" ? leftHostRef : rightHostRef}
+                className="h-96 max-h-[60dvh] min-h-0 flex-none xl:h-auto xl:max-h-none xl:flex-1"
+              />
+            </div>
+            {side === "left" ? (
+              <div
+                ref={connectorHostRef}
+                className="pointer-events-none relative hidden min-h-0 overflow-hidden lg:block"
+                aria-hidden="true"
+              >
+                <svg
+                  className="absolute inset-0 h-full w-full overflow-hidden"
+                  data-diff-connectors="true"
+                >
+                  <defs>
+                    <clipPath id={connectorClipId}>
+                      <rect
+                        x="0"
+                        y={clip.start}
+                        width="56"
+                        height={Math.max(clip.end - clip.start, 0)}
+                      />
+                    </clipPath>
+                    <linearGradient id={connectorGradientId}>
+                      <stop offset="0%" stopColor="rgb(var(--color-danger))" />
+                      <stop
+                        offset="100%"
+                        stopColor="rgb(var(--color-success))"
+                      />
+                    </linearGradient>
+                  </defs>
+                  <g clipPath={`url(#${connectorClipId})`}>
+                    {connectors.map(
+                      ({ range, left, right, leftBounds, rightBounds }) => {
+                        const active = activeDiffRange?.start === range.start;
+                        const color =
+                          leftBounds.start === leftBounds.end
+                            ? "rgb(var(--color-success))"
+                            : rightBounds.start === rightBounds.end
+                              ? "rgb(var(--color-danger))"
+                              : `url(#${connectorGradientId})`;
+                        return (
+                          <path
+                            key={range.start}
+                            data-diff-start={range.start}
+                            data-left-start={leftBounds.start}
+                            data-left-end={leftBounds.end}
+                            data-right-start={rightBounds.start}
+                            data-right-end={rightBounds.end}
+                            d={`M 0 ${left.start} C 28 ${left.start} 28 ${right.start} 56 ${right.start} L 56 ${right.end} C 28 ${right.end} 28 ${left.end} 0 ${left.end} Z`}
+                            fill={color}
+                            fillOpacity={active ? 0.18 : 0.1}
+                            stroke={active ? "rgb(var(--color-accent))" : color}
+                            strokeOpacity={active ? 0.7 : 0.3}
+                            strokeWidth="1"
+                          />
+                        );
+                      },
+                    )}
+                  </g>
+                </svg>
+              </div>
+            ) : null}
+          </Fragment>
+        ))}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { generateQrCode } from "@z-dev-toolbox/core";
 import type { Locale } from "@z-dev-toolbox/shared";
@@ -76,7 +76,7 @@ const panelCopy: Record<
     downloadAction: "下载结果",
     uploadAction: "上传图片",
     generatePlaceholder: "输入要写入二维码的文本、链接或其他内容",
-    parsePlaceholder: "上传图片，或将焦点停留在此处后粘贴剪贴板中的截图。",
+    parsePlaceholder: "上传图片或直接粘贴截图",
     generateEmpty: "",
     parseEmpty: "",
     generated: "二维码已生成",
@@ -101,8 +101,7 @@ const panelCopy: Record<
     downloadAction: "Download",
     uploadAction: "Upload image",
     generatePlaceholder: "Enter the text, URL, or content to encode",
-    parsePlaceholder:
-      "Upload an image, or focus this area and paste one from the clipboard.",
+    parsePlaceholder: "Upload an image or paste a screenshot",
     generateEmpty: "",
     parseEmpty: "",
     generated: "QR generated",
@@ -262,6 +261,7 @@ export const QrCodePanel = ({
     null,
   );
   const latestGenerateRunRef = useRef(0);
+  const latestParseRunRef = useRef(0);
   const { feedback, setFeedback, copyText, reportSuccess } = useToolFeedback({
     autoCopyOnSuccess,
     bridge,
@@ -287,6 +287,7 @@ export const QrCodePanel = ({
   );
 
   const resetResults = () => {
+    latestParseRunRef.current += 1;
     setSvg("");
     setParsedResult(null);
     setFeedback(null);
@@ -357,40 +358,104 @@ export const QrCodePanel = ({
     }, AUTO_RUN_DELAY_MS);
   };
 
-  const handleParsedFile = async (file: File) => {
-    try {
-      const [previewUrl, detected] = await Promise.all([
-        readPreviewUrl(file),
-        detectQrCode(file),
-      ]);
+  const handleParsedFile = useCallback(
+    async (file: File) => {
+      const runId = ++latestParseRunRef.current;
 
-      setParsedImage({
-        file,
-        previewUrl,
-      });
-      setParsedResult(detected);
-      reportSuccess(text.parsed, detected.text);
-    } catch (error) {
-      const qrDetectUnavailableMessage =
-        text.errorMessage.QR_DETECT_UNAVAILABLE ??
-        text.errorMessage.QR_CODE_FAILED ??
-        "二维码解析失败";
-      const qrDetectFailedMessage =
-        text.errorMessage.QR_DETECT_FAILED ??
-        text.errorMessage.QR_CODE_FAILED ??
-        "二维码解析失败";
-      const reason =
-        error instanceof Error && error.message === "QR_DETECT_UNAVAILABLE"
-          ? qrDetectUnavailableMessage
-          : `${qrDetectFailedMessage}: ${error instanceof Error ? error.message : ""}`.trim();
-
+      setParsedImage(null);
       setParsedResult(null);
-      setFeedback({
-        tone: "error",
-        text: reason,
-      });
+      setFeedback(null);
+
+      try {
+        const previewUrl = await readPreviewUrl(file);
+
+        if (latestParseRunRef.current !== runId) {
+          return;
+        }
+
+        setParsedImage({
+          file,
+          previewUrl,
+        });
+
+        const detected = await detectQrCode(file);
+
+        if (latestParseRunRef.current !== runId) {
+          return;
+        }
+
+        setParsedResult(detected);
+        reportSuccess(
+          text.parsed,
+          detected.text,
+          () => latestParseRunRef.current === runId,
+        );
+      } catch (error) {
+        if (latestParseRunRef.current !== runId) {
+          return;
+        }
+
+        const qrDetectUnavailableMessage =
+          text.errorMessage.QR_DETECT_UNAVAILABLE ??
+          text.errorMessage.QR_CODE_FAILED ??
+          "二维码解析失败";
+        const qrDetectFailedMessage =
+          text.errorMessage.QR_DETECT_FAILED ??
+          text.errorMessage.QR_CODE_FAILED ??
+          "二维码解析失败";
+        const reason =
+          error instanceof Error && error.message === "QR_DETECT_UNAVAILABLE"
+            ? qrDetectUnavailableMessage
+            : `${qrDetectFailedMessage}: ${error instanceof Error ? error.message : ""}`.trim();
+
+        setParsedResult(null);
+        setFeedback({
+          tone: "error",
+          text: reason,
+        });
+      }
+    },
+    [reportSuccess, setFeedback, text],
+  );
+
+  useEffect(() => {
+    if (draft.mode !== "parse") {
+      return;
     }
-  };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const target = event.target;
+
+      if (
+        event.defaultPrevented ||
+        document.querySelector('[aria-modal="true"]') ||
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.closest("input, textarea, select")))
+      ) {
+        return;
+      }
+
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.type.startsWith("image/"))
+        ?.getAsFile();
+
+      if (file) {
+        event.preventDefault();
+        void handleParsedFile(file);
+      }
+    };
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [draft.mode, handleParsedFile]);
+
+  useEffect(
+    () => () => {
+      latestParseRunRef.current += 1;
+    },
+    [draft.mode],
+  );
 
   const handleDownload = async () => {
     if (!svg) {
@@ -513,8 +578,6 @@ export const QrCodePanel = ({
                 const file = event.currentTarget.files?.[0];
 
                 if (file) {
-                  setParsedImage(null);
-                  setParsedResult(null);
                   void handleParsedFile(file);
                 }
 
@@ -535,16 +598,6 @@ export const QrCodePanel = ({
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   fileInputRef.current?.click();
-                }
-              }}
-              onPaste={(event) => {
-                const file = Array.from(event.clipboardData.items)
-                  .find((item) => item.type.startsWith("image/"))
-                  ?.getAsFile();
-
-                if (file) {
-                  event.preventDefault();
-                  void handleParsedFile(file);
                 }
               }}
             >

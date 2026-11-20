@@ -72,6 +72,14 @@ type ComparableOperation<T extends ComparableValue> =
       item: T;
     };
 
+type LineOperation =
+  | ComparableOperation<ComparableLine>
+  | {
+      kind: "changed";
+      beforeItem: ComparableLine;
+      afterItem: ComparableLine;
+    };
+
 const LINE_DIFF_LIMIT = 160_000;
 const INLINE_DIFF_LIMIT = 24_000;
 const splitTokenPattern = /\s+|[\p{L}\p{N}_]+|./gu;
@@ -85,14 +93,14 @@ const textDiffInputSchema = z.object({
     .optional(),
   ignoreMode: z
     .enum(["none", "trim", "space", "space-and-empty-lines"])
-    .default("none")
+    .default("none"),
 });
 
 export type TextDiffInput = z.input<typeof textDiffInputSchema>;
 
 const resolveHighlightMode = (
   mode: "line" | "word" | undefined,
-  highlightMode: TextDiffHighlightMode | undefined
+  highlightMode: TextDiffHighlightMode | undefined,
 ): TextDiffHighlightMode => {
   if (highlightMode) {
     return highlightMode;
@@ -103,7 +111,7 @@ const resolveHighlightMode = (
 
 const normalizeLineForComparison = (
   value: string,
-  ignoreMode: TextDiffIgnoreMode
+  ignoreMode: TextDiffIgnoreMode,
 ) => {
   if (ignoreMode === "trim") {
     return value.trim();
@@ -118,35 +126,35 @@ const normalizeLineForComparison = (
 
 const tokenizeByLine = (
   value: string,
-  ignoreMode: TextDiffIgnoreMode
+  ignoreMode: TextDiffIgnoreMode,
 ): ComparableLine[] =>
   (value.length > 0 ? value.split("\n") : []).map((line, index) => ({
     value: line,
     key: normalizeLineForComparison(line, ignoreMode),
-    lineNumber: index + 1
+    lineNumber: index + 1,
   }));
 
 const tokenizeByWord = (value: string): ComparableValue[] =>
   (value.match(/\s+|[^\s]+/g) ?? []).map((token) => ({
     value: token,
-    key: token
+    key: token,
   }));
 
 const tokenizeBySplit = (value: string): ComparableValue[] =>
   (value.match(splitTokenPattern) ?? []).map((token) => ({
     value: token,
-    key: token
+    key: token,
   }));
 
 const tokenizeByCharacter = (value: string): ComparableValue[] =>
   Array.from(value).map((token) => ({
     value: token,
-    key: token
+    key: token,
   }));
 
 const getInlineTokens = (
   value: string,
-  highlightMode: TextDiffHighlightMode
+  highlightMode: TextDiffHighlightMode,
 ): ComparableValue[] => {
   if (highlightMode === "word") {
     return tokenizeByWord(value);
@@ -166,7 +174,7 @@ const getInlineTokens = (
 const diffComparableValues = <T extends ComparableValue>(
   before: T[],
   after: T[],
-  limit: number
+  limit: number,
 ) => {
   const rows = before.length;
   const cols = after.length;
@@ -205,7 +213,7 @@ const diffComparableValues = <T extends ComparableValue>(
       operations.push({
         kind: "equal",
         beforeItem,
-        afterItem
+        afterItem,
       });
       row += 1;
       col += 1;
@@ -216,7 +224,7 @@ const diffComparableValues = <T extends ComparableValue>(
       if (beforeItem) {
         operations.push({
           kind: "removed",
-          item: beforeItem
+          item: beforeItem,
         });
       }
       row += 1;
@@ -226,7 +234,7 @@ const diffComparableValues = <T extends ComparableValue>(
     if (afterItem) {
       operations.push({
         kind: "added",
-        item: afterItem
+        item: afterItem,
       });
     }
     col += 1;
@@ -238,7 +246,7 @@ const diffComparableValues = <T extends ComparableValue>(
     if (beforeItem) {
       operations.push({
         kind: "removed",
-        item: beforeItem
+        item: beforeItem,
       });
     }
     row += 1;
@@ -250,7 +258,7 @@ const diffComparableValues = <T extends ComparableValue>(
     if (afterItem) {
       operations.push({
         kind: "added",
-        item: afterItem
+        item: afterItem,
       });
     }
     col += 1;
@@ -259,10 +267,119 @@ const diffComparableValues = <T extends ComparableValue>(
   return operations;
 };
 
+const diffLines = (
+  before: ComparableLine[],
+  after: ComparableLine[],
+  ignoreMode: TextDiffIgnoreMode,
+) => {
+  const sourceBefore = before;
+  const sourceAfter = after;
+  if (ignoreMode === "space-and-empty-lines") {
+    before = before.filter((line) => line.key !== "");
+    after = after.filter((line) => line.key !== "");
+  }
+  const rows = before.length;
+  const cols = after.length;
+
+  if (rows * cols > LINE_DIFF_LIMIT) {
+    throw new Error("文本体积过大，当前差异算法无法稳定处理。");
+  }
+
+  const dp = Array.from({ length: rows + 1 }, (_, row) =>
+    Array.from({ length: cols + 1 }, (_, col) =>
+      row === rows ? cols - col : col === cols ? rows - row : 0,
+    ),
+  );
+
+  for (let row = rows - 1; row >= 0; row -= 1) {
+    for (let col = cols - 1; col >= 0; col -= 1) {
+      dp[row]![col] =
+        before[row]!.key === after[col]!.key
+          ? dp[row + 1]![col + 1]!
+          : 1 +
+            Math.min(
+              dp[row + 1]![col + 1]!,
+              dp[row + 1]![col]!,
+              dp[row]![col + 1]!,
+            );
+    }
+  }
+
+  const operations: LineOperation[] = [];
+  let row = 0;
+  let col = 0;
+
+  while (row < rows || col < cols) {
+    const beforeItem = before[row];
+    const afterItem = after[col];
+
+    if (beforeItem && afterItem && beforeItem.key === afterItem.key) {
+      operations.push({ kind: "equal", beforeItem, afterItem });
+      row += 1;
+      col += 1;
+    } else if (
+      beforeItem &&
+      afterItem &&
+      dp[row]![col] === 1 + dp[row + 1]![col + 1]!
+    ) {
+      // Prefer a replacement when equally short alignments are available.
+      operations.push({ kind: "changed", beforeItem, afterItem });
+      row += 1;
+      col += 1;
+    } else if (
+      beforeItem &&
+      (!afterItem || dp[row]![col] === 1 + dp[row + 1]![col]!)
+    ) {
+      operations.push({ kind: "removed", item: beforeItem });
+      row += 1;
+    } else if (afterItem) {
+      operations.push({ kind: "added", item: afterItem });
+      col += 1;
+    }
+  }
+
+  if (ignoreMode !== "space-and-empty-lines") return operations;
+
+  // Keep ignored source lines visible without letting them influence matching.
+  const withBlankLines: LineOperation[] = [];
+  let left = 0;
+  let right = 0;
+  for (const operation of operations) {
+    const leftItem =
+      operation.kind === "equal" || operation.kind === "changed"
+        ? operation.beforeItem
+        : operation.kind === "removed"
+          ? operation.item
+          : null;
+    const rightItem =
+      operation.kind === "equal" || operation.kind === "changed"
+        ? operation.afterItem
+        : operation.kind === "added"
+          ? operation.item
+          : null;
+    while (leftItem && sourceBefore[left]!.lineNumber < leftItem.lineNumber) {
+      withBlankLines.push({ kind: "removed", item: sourceBefore[left++]! });
+    }
+    while (rightItem && sourceAfter[right]!.lineNumber < rightItem.lineNumber) {
+      withBlankLines.push({ kind: "added", item: sourceAfter[right++]! });
+    }
+    withBlankLines.push(operation);
+    if (leftItem) left += 1;
+    if (rightItem) right += 1;
+  }
+  while (left < sourceBefore.length) {
+    withBlankLines.push({ kind: "removed", item: sourceBefore[left++]! });
+  }
+  while (right < sourceAfter.length) {
+    withBlankLines.push({ kind: "added", item: sourceAfter[right++]! });
+  }
+  return withBlankLines;
+};
+
 const appendSpan = (
   spans: TextDiffInlineSpan[],
   kind: DiffKind,
-  value: string
+  value: string,
 ) => {
   if (!value.length) {
     return;
@@ -281,13 +398,13 @@ const appendSpan = (
 const buildInlineSpans = (
   before: string,
   after: string,
-  highlightMode: TextDiffHighlightMode
+  highlightMode: TextDiffHighlightMode,
 ) => {
   try {
     const operations = diffComparableValues(
       getInlineTokens(before, highlightMode),
       getInlineTokens(after, highlightMode),
-      INLINE_DIFF_LIMIT
+      INLINE_DIFF_LIMIT,
     );
     const leftSpans: TextDiffInlineSpan[] = [];
     const rightSpans: TextDiffInlineSpan[] = [];
@@ -313,14 +430,16 @@ const buildInlineSpans = (
       leftSpans: before.length
         ? [{ kind: "removed" as const, value: before }]
         : [],
-      rightSpans: after.length ? [{ kind: "added" as const, value: after }] : []
+      rightSpans: after.length
+        ? [{ kind: "added" as const, value: after }]
+        : [],
     };
   }
 };
 
 const shouldIgnoreBlankDiff = (
   row: TextDiffRow,
-  ignoreMode: TextDiffIgnoreMode
+  ignoreMode: TextDiffIgnoreMode,
 ) => {
   if (ignoreMode !== "space-and-empty-lines") {
     return false;
@@ -345,95 +464,52 @@ const shouldIgnoreBlankDiff = (
 };
 
 const buildRows = (
-  operations: ComparableOperation<ComparableLine>[],
+  operations: LineOperation[],
   highlightMode: TextDiffHighlightMode,
-  ignoreMode: TextDiffIgnoreMode
+  ignoreMode: TextDiffIgnoreMode,
 ): TextDiffRow[] => {
-  const rows: TextDiffRow[] = [];
-  let index = 0;
+  return operations.map((operation) => {
+    const leftItem =
+      operation.kind === "equal" || operation.kind === "changed"
+        ? operation.beforeItem
+        : operation.kind === "removed"
+          ? operation.item
+          : undefined;
+    const rightItem =
+      operation.kind === "equal" || operation.kind === "changed"
+        ? operation.afterItem
+        : operation.kind === "added"
+          ? operation.item
+          : undefined;
+    const row: TextDiffRow = {
+      kind: operation.kind,
+      leftLineNumber: leftItem?.lineNumber ?? null,
+      rightLineNumber: rightItem?.lineNumber ?? null,
+      leftText: leftItem?.value ?? "",
+      rightText: rightItem?.value ?? "",
+    };
 
-  while (index < operations.length) {
-    const current = operations[index];
-
-    if (!current) {
-      break;
+    if (
+      row.kind === "changed" &&
+      (highlightMode === "word" ||
+        highlightMode === "split" ||
+        highlightMode === "character")
+    ) {
+      const { leftSpans, rightSpans } = buildInlineSpans(
+        row.leftText,
+        row.rightText,
+        highlightMode,
+      );
+      row.leftSpans = leftSpans;
+      row.rightSpans = rightSpans;
     }
 
-    if (current.kind === "equal") {
-      rows.push({
-        kind: "equal",
-        leftLineNumber: current.beforeItem.lineNumber,
-        rightLineNumber: current.afterItem.lineNumber,
-        leftText: current.beforeItem.value,
-        rightText: current.afterItem.value
-      });
-      index += 1;
-      continue;
+    if (shouldIgnoreBlankDiff(row, ignoreMode)) {
+      row.kind = "equal";
     }
 
-    const removed: ComparableLine[] = [];
-    const added: ComparableLine[] = [];
-
-    while (operations[index]?.kind === "removed") {
-      const operation = operations[index];
-
-      if (operation?.kind === "removed") {
-        removed.push(operation.item);
-      }
-      index += 1;
-    }
-
-    while (operations[index]?.kind === "added") {
-      const operation = operations[index];
-
-      if (operation?.kind === "added") {
-        added.push(operation.item);
-      }
-      index += 1;
-    }
-
-    const rowCount = Math.max(removed.length, added.length);
-
-    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
-      const leftItem = removed[rowIndex];
-      const rightItem = added[rowIndex];
-      const row: TextDiffRow = {
-        kind:
-          leftItem && rightItem
-            ? "changed"
-            : leftItem
-              ? "removed"
-              : "added",
-        leftLineNumber: leftItem?.lineNumber ?? null,
-        rightLineNumber: rightItem?.lineNumber ?? null,
-        leftText: leftItem?.value ?? "",
-        rightText: rightItem?.value ?? ""
-      };
-
-      if (
-        row.kind === "changed" &&
-        (highlightMode === "word" ||
-          highlightMode === "split" ||
-          highlightMode === "character")
-      ) {
-        const { leftSpans, rightSpans } = buildInlineSpans(
-          row.leftText,
-          row.rightText,
-          highlightMode
-        );
-        row.leftSpans = leftSpans;
-        row.rightSpans = rightSpans;
-      }
-
-      if (shouldIgnoreBlankDiff(row, ignoreMode)) {
-        row.kind = "equal";
-      }
-
-      rows.push(row);
-    }
-  }
-
-  return rows;
+    return row;
+  });
 };
 
 const summarizeRows = (rows: TextDiffRow[]) =>
@@ -453,50 +529,68 @@ const summarizeRows = (rows: TextDiffRow[]) =>
 
       return summary;
     },
-    { additions: 0, removals: 0, unchanged: 0 }
+    { additions: 0, removals: 0, unchanged: 0 },
   );
 
-const countDiffPoints = (rows: TextDiffRow[]) => {
-  let diffCount = 0;
-  let inDiffBlock = false;
+export const getTextDiffRanges = (
+  rows: TextDiffRow[],
+  ignoreMode: TextDiffIgnoreMode,
+) => {
+  const ranges: { start: number; end: number }[] = [];
+  let current: { start: number; end: number } | null = null;
 
-  for (const row of rows) {
+  rows.forEach((row, index) => {
+    if (
+      ignoreMode === "space-and-empty-lines" &&
+      normalizeLineForComparison(row.leftText, "space") === "" &&
+      normalizeLineForComparison(row.rightText, "space") === ""
+    )
+      return;
     if (row.kind === "equal") {
-      inDiffBlock = false;
-      continue;
+      if (current) ranges.push(current);
+      current = null;
+      return;
     }
 
-    if (!inDiffBlock) {
-      diffCount += 1;
-      inDiffBlock = true;
-    }
-  }
+    if (current) current.end = index;
+    else current = { start: index, end: index };
+  });
+  if (current) ranges.push(current);
 
-  return diffCount;
+  return ranges;
 };
 
-const mapLineOperationsToChunks = (
-  operations: ComparableOperation<ComparableLine>[]
-): DiffChunk[] =>
-  operations.map((operation) => {
-    if (operation.kind === "equal") {
-      return {
-        kind: "equal" as const,
-        value: operation.beforeItem.value
-      };
+const mapLineOperationsToChunks = (operations: LineOperation[]): DiffChunk[] =>
+  operations.flatMap((operation): DiffChunk[] => {
+    if (operation.kind === "changed") {
+      return [
+        { kind: "removed", value: operation.beforeItem.value },
+        { kind: "added", value: operation.afterItem.value },
+      ];
     }
 
-    return {
-      kind: operation.kind,
-      value: operation.item.value
-    };
+    if (operation.kind === "equal") {
+      return [
+        {
+          kind: "equal" as const,
+          value: operation.beforeItem.value,
+        },
+      ];
+    }
+
+    return [
+      {
+        kind: operation.kind,
+        value: operation.item.value,
+      },
+    ];
   });
 
 const buildLegacyChunks = (
   before: string,
   after: string,
   highlightMode: TextDiffHighlightMode,
-  lineOperations: ComparableOperation<ComparableLine>[]
+  lineOperations: LineOperation[],
 ) => {
   if (
     highlightMode !== "word" &&
@@ -510,20 +604,20 @@ const buildLegacyChunks = (
     const operations = diffComparableValues(
       getInlineTokens(before, highlightMode),
       getInlineTokens(after, highlightMode),
-      INLINE_DIFF_LIMIT
+      INLINE_DIFF_LIMIT,
     );
 
     return operations.map((operation) => {
       if (operation.kind === "equal") {
         return {
           kind: "equal" as const,
-          value: operation.beforeItem.value
+          value: operation.beforeItem.value,
         };
       }
 
       return {
         kind: operation.kind,
-        value: operation.item.value
+        value: operation.item.value,
       };
     });
   } catch {
@@ -538,29 +632,25 @@ export const diffText = (input: TextDiffInput) => {
     return createToolError({
       code: "INVALID_INPUT",
       message: "文本对比输入参数不合法。",
-      details: parsedInput.error.issues[0]?.message
+      details: parsedInput.error.issues[0]?.message,
     });
   }
 
   try {
     const { before, after, mode, highlightMode, ignoreMode } = parsedInput.data;
     const effectiveHighlightMode = resolveHighlightMode(mode, highlightMode);
-    const lineOperations = diffComparableValues(
+    const lineOperations = diffLines(
       tokenizeByLine(before, ignoreMode),
       tokenizeByLine(after, ignoreMode),
-      LINE_DIFF_LIMIT
+      ignoreMode,
     );
-    const rows = buildRows(
-      lineOperations,
-      effectiveHighlightMode,
-      ignoreMode
-    );
+    const rows = buildRows(lineOperations, effectiveHighlightMode, ignoreMode);
     const summary = summarizeRows(rows);
     const chunks = buildLegacyChunks(
       before,
       after,
       effectiveHighlightMode,
-      lineOperations
+      lineOperations,
     );
 
     return createToolSuccess<TextDiffOutput>({
@@ -572,13 +662,13 @@ export const diffText = (input: TextDiffInput) => {
       additions: summary.additions,
       removals: summary.removals,
       unchanged: summary.unchanged,
-      diffCount: countDiffPoints(rows)
+      diffCount: getTextDiffRanges(rows, ignoreMode).length,
     });
   } catch (error) {
     return createToolError({
       code: "DIFF_FAILED",
       message: "文本对比失败。",
-      details: error instanceof Error ? error.message : "未知错误。"
+      details: error instanceof Error ? error.message : "未知错误。",
     });
   }
 };

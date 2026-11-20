@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import {
   diffText,
+  getTextDiffRanges,
   type TextDiffHighlightMode,
   type TextDiffIgnoreMode,
-  type TextDiffRow
+  type TextDiffRow,
 } from "@z-dev-toolbox/core";
 import type { Locale } from "@z-dev-toolbox/shared";
 import { Button } from "@z-dev-toolbox/ui";
@@ -14,20 +15,20 @@ import {
   ToolControlField,
   ToolGrid,
   ToolPane,
-  ToolSelect
+  ToolSelect,
 } from "../components/tool-panel-kit";
 import { useToolDraftState } from "../components/use-tool-draft-state";
 import { useToolFeedback } from "../components/use-tool-feedback";
 import type { ToolPanelProps } from "../types";
 import { formatToolError } from "./panel-copy";
-import { TextDiffViewer } from "./text-diff-viewer";
+
+const TextDiffViewer = lazy(() =>
+  import("./text-diff-viewer").then((module) => ({
+    default: module.TextDiffViewer,
+  })),
+);
 
 const TOOL_DRAFT_KEY = "tool:text.diff:draft:v4";
-
-interface DiffRange {
-  start: number;
-  end: number;
-}
 
 const splitLines = (value: string) =>
   value.length > 0 ? value.split("\n") : [];
@@ -45,46 +46,22 @@ const buildFallbackRows = (before: string, after: string): TextDiffRow[] => {
     const rightText = afterLines[index] ?? "";
 
     rows.push({
-      kind: hasLeft && hasRight ? (leftText === rightText ? "equal" : "changed") : hasLeft ? "removed" : "added",
+      kind:
+        hasLeft && hasRight
+          ? leftText === rightText
+            ? "equal"
+            : "changed"
+          : hasLeft
+            ? "removed"
+            : "added",
       leftLineNumber: hasLeft ? index + 1 : null,
       rightLineNumber: hasRight ? index + 1 : null,
       leftText,
-      rightText
+      rightText,
     });
   }
 
   return rows;
-};
-
-const buildDiffRanges = (rows: TextDiffRow[]) => {
-  const ranges: DiffRange[] = [];
-  let currentStart: number | null = null;
-
-  rows.forEach((row, index) => {
-    if (row.kind === "equal") {
-      if (currentStart !== null) {
-        ranges.push({
-          start: currentStart,
-          end: index - 1
-        });
-        currentStart = null;
-      }
-      return;
-    }
-
-    if (currentStart === null) {
-      currentStart = index;
-    }
-  });
-
-  if (currentStart !== null) {
-    ranges.push({
-      start: currentStart,
-      end: rows.length - 1
-    });
-  }
-
-  return ranges;
 };
 
 const panelCopy: Record<
@@ -106,8 +83,8 @@ const panelCopy: Record<
 > = {
   "zh-CN": {
     title: "文本对比",
-    beforeLabel: "原始内容",
-    afterLabel: "修改后内容",
+    beforeLabel: "左侧文本",
+    afterLabel: "右侧文本",
     highlightLabel: "高亮",
     ignoreLabel: "忽略",
     highlightOptions: {
@@ -115,13 +92,13 @@ const panelCopy: Record<
       word: "高亮显示单词",
       split: "高亮显示拆分的更改",
       character: "高亮显示字符",
-      none: "不高亮显示"
+      none: "不高亮显示",
     },
     ignoreOptions: {
       none: "不忽略",
       trim: "修整空白",
       space: "忽略空格",
-      "space-and-empty-lines": "忽略空格和空行"
+      "space-and-empty-lines": "忽略空格和空行",
     },
     clear: "重置",
     previousDiff: "上一个差异",
@@ -129,13 +106,13 @@ const panelCopy: Record<
     diffCount: (count) => `${count} 个差异点`,
     errorMessage: {
       INVALID_INPUT: "输入参数无效",
-      DIFF_FAILED: "文本对比失败"
-    }
+      DIFF_FAILED: "文本对比失败",
+    },
   },
   "en-US": {
     title: "Text Diff",
-    beforeLabel: "Original",
-    afterLabel: "Revised",
+    beforeLabel: "Left text",
+    afterLabel: "Right text",
     highlightLabel: "Highlight",
     ignoreLabel: "Ignore",
     highlightOptions: {
@@ -143,13 +120,13 @@ const panelCopy: Record<
       word: "Highlight words",
       split: "Highlight split changes",
       character: "Highlight characters",
-      none: "No highlighting"
+      none: "No highlighting",
     },
     ignoreOptions: {
       none: "Do not ignore",
       trim: "Trim whitespace",
       space: "Ignore spaces",
-      "space-and-empty-lines": "Ignore spaces and empty lines"
+      "space-and-empty-lines": "Ignore spaces and empty lines",
     },
     clear: "Reset",
     previousDiff: "Previous diff",
@@ -157,31 +134,32 @@ const panelCopy: Record<
     diffCount: (count) => `${count} diff points`,
     errorMessage: {
       INVALID_INPUT: "Invalid input",
-      DIFF_FAILED: "Diff failed"
-    }
-  }
+      DIFF_FAILED: "Diff failed",
+    },
+  },
 };
 
 export const TextDiffPanel = ({
   bridge,
   locale,
   notify,
-  storage
+  storage,
 }: ToolPanelProps) => {
   const text = panelCopy[locale];
   const [draft, setDraft] = useToolDraftState(storage, TOOL_DRAFT_KEY, {
     before: "",
     after: "",
     highlightMode: "line" as TextDiffHighlightMode,
-    ignoreMode: "none" as TextDiffIgnoreMode
+    ignoreMode: "none" as TextDiffIgnoreMode,
   });
   const [activeDiffIndex, setActiveDiffIndex] = useState(-1);
+  const [navigationRequest, setNavigationRequest] = useState(0);
   const { feedback, setFeedback } = useToolFeedback({
     autoCopyOnSuccess: false,
     bridge,
     copiedText: "",
     copyFailedText: "",
-    notify
+    notify,
   });
   const diffResult = useMemo(
     () =>
@@ -189,9 +167,9 @@ export const TextDiffPanel = ({
         before: draft.before,
         after: draft.after,
         highlightMode: draft.highlightMode,
-        ignoreMode: draft.ignoreMode
+        ignoreMode: draft.ignoreMode,
       }),
-    [draft.after, draft.before, draft.highlightMode, draft.ignoreMode]
+    [draft.after, draft.before, draft.highlightMode, draft.ignoreMode],
   );
 
   useEffect(() => {
@@ -202,7 +180,7 @@ export const TextDiffPanel = ({
 
     setFeedback({
       tone: "error",
-      text: formatToolError(diffResult.error, text.errorMessage)
+      text: formatToolError(diffResult.error, text.errorMessage),
     });
   }, [diffResult, setFeedback, text.errorMessage]);
 
@@ -214,10 +192,15 @@ export const TextDiffPanel = ({
     return buildFallbackRows(draft.before, draft.after);
   }, [diffResult, draft.after, draft.before]);
 
-  const diffRanges = useMemo(() => buildDiffRanges(rows), [rows]);
-  const diffCount = diffResult.ok ? diffResult.data.diffCount : diffRanges.length;
+  const diffRanges = useMemo(
+    () => getTextDiffRanges(rows, draft.ignoreMode),
+    [rows, draft.ignoreMode],
+  );
+  const diffCount = diffResult.ok
+    ? diffResult.data.diffCount
+    : diffRanges.length;
   const activeDiffRange =
-    activeDiffIndex >= 0 ? diffRanges[activeDiffIndex] ?? null : null;
+    activeDiffIndex >= 0 ? (diffRanges[activeDiffIndex] ?? null) : null;
   const errorText = feedback?.tone === "error" ? feedback.text : null;
 
   useEffect(() => {
@@ -239,6 +222,8 @@ export const TextDiffPanel = ({
     if (!diffRanges.length) {
       return;
     }
+
+    setNavigationRequest((current) => current + 1);
 
     setActiveDiffIndex((current) => {
       if (direction === "previous") {
@@ -291,7 +276,7 @@ export const TextDiffPanel = ({
                 onValueChange={(value) => {
                   setDraft((current) => ({
                     ...current,
-                    highlightMode: value as TextDiffHighlightMode
+                    highlightMode: value as TextDiffHighlightMode,
                   }));
                 }}
               >
@@ -311,7 +296,7 @@ export const TextDiffPanel = ({
                 onValueChange={(value) => {
                   setDraft((current) => ({
                     ...current,
-                    ignoreMode: value as TextDiffIgnoreMode
+                    ignoreMode: value as TextDiffIgnoreMode,
                   }));
                 }}
               >
@@ -331,7 +316,7 @@ export const TextDiffPanel = ({
                   before: "",
                   after: "",
                   highlightMode: "line",
-                  ignoreMode: "none"
+                  ignoreMode: "none",
                 });
                 setActiveDiffIndex(-1);
                 setFeedback(null);
@@ -342,28 +327,32 @@ export const TextDiffPanel = ({
           </ToolActionBar>
         }
       >
-        <TextDiffViewer
-          activeDiffRange={activeDiffRange}
-          after={draft.after}
-          afterLabel={text.afterLabel}
-          before={draft.before}
-          beforeLabel={text.beforeLabel}
-          errorText={errorText}
-          highlightMode={draft.highlightMode}
-          rows={rows}
-          onAfterChange={(value) => {
-            setDraft((current) => ({
-              ...current,
-              after: value
-            }));
-          }}
-          onBeforeChange={(value) => {
-            setDraft((current) => ({
-              ...current,
-              before: value
-            }));
-          }}
-        />
+        <Suspense fallback={<div className="min-h-[280px] flex-1" />}>
+          <TextDiffViewer
+            diffRanges={diffRanges}
+            navigationRequest={navigationRequest}
+            activeDiffRange={activeDiffRange}
+            after={draft.after}
+            afterLabel={text.afterLabel}
+            before={draft.before}
+            beforeLabel={text.beforeLabel}
+            errorText={errorText}
+            highlightMode={draft.highlightMode}
+            rows={rows}
+            onAfterChange={(value) => {
+              setDraft((current) => ({
+                ...current,
+                after: value,
+              }));
+            }}
+            onBeforeChange={(value) => {
+              setDraft((current) => ({
+                ...current,
+                before: value,
+              }));
+            }}
+          />
+        </Suspense>
       </ToolPane>
     </ToolGrid>
   );

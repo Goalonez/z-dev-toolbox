@@ -1124,7 +1124,12 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         </div>
       ) : null}
       {isSettingsOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.42)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4">
+        <div
+          aria-modal="true"
+          role="dialog"
+          aria-label={text.settingsTitle}
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.42)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4"
+        >
           <button
             aria-label={text.closeSettingsLabel}
             className="absolute inset-0"
@@ -1291,7 +1296,12 @@ export const ToolboxApp = ({ bridge, platform, storage }: ToolboxAppProps) => {
         </div>
       ) : null}
       {isUpdatePromptOpen && availableUpdate ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.46)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4">
+        <div
+          aria-modal="true"
+          role="dialog"
+          aria-label={text.updatePromptTitle}
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(var(--color-shadow-ambient)/0.46)] px-3 py-3 backdrop-blur-[10px] sm:items-center sm:px-4"
+        >
           <button
             aria-label={text.dismissUpdateLabel}
             className="absolute inset-0"

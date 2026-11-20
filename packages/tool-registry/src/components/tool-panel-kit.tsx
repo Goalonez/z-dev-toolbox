@@ -231,6 +231,7 @@ export const ToolActionBar = ({
         ref={actionsRef}
         className={cn(
           toolActionGroupClassName,
+          toolActionGapClassMap[density],
           actionsClassName,
           toolActionDensityClassMap[density],
         )}
